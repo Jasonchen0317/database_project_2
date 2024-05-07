@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block content %}
+	<form action="" method="post" novalidate>
+		{{ form.hidden_tag() }}
+		<p>
+			{{ form.title.label }}<br>
+			{{ form.title(size=32) }}
+		</p>
+		<p>
+			{{ form.target.label }}<br>
+			{{ form.target() }}
+		</p>
+		<p>
+			{{ form.rid.label }}<br>
+			{{ form.rid(size=32) }}
+		</p>
+		<p>
+			{{ form.latitude.label }}<br>
+			{{ form.latitude(size=32) }}
+		</p>
+		<p>
+			{{ form.longitude.label }}<br>
+			{{ form.longitude(size=32) }}
+		</p>
+		<p>
+			{{ form.body.label }}<br>
+			{{ form.body(size=64) }}
+		</p>
+		<p>{{ form.submit() }}</p>
+	</form>
+{% endblock %}

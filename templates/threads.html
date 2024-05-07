@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+    <h1>{% block title %} Home Page{% endblock %}</h1>
+    <p>Welcome back, {{ username }}!</p>
+    {% for t in threads %}
+        <div class='Threads'>
+            <h3>Thread ID: {{ t[0] }} - Title: {{ t[5] }}</h3>
+        </div>
+        <div class="links">
+            <a href="{{ url_for('messages', id=t[0]) }}" class="active">more</a>
+        </div>
+    {% endfor %}
+    <div class="links">
+        <a href="{{ url_for('postthread') }}" class="active">Create Thread</a>
+    </div>
+{% endblock %}

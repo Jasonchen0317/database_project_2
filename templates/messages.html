@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block content %}
+    {% for m in messages %}
+        <div class="message">
+            <h3>Message ID: {{ m[0] }} - Title: {{ m[5] }}</h3>
+        </div>
+    {% endfor %}
+    
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block content %}
+	<form action="" method="post" novalidate>
+		{{ form.hidden_tag() }}
+		<p>
+			{{ form.username.label }}<br>
+			{{ form.username(size=32) }}
+		</p>
+		<p>
+			{{ form.password.label }}<br>
+			{{ form.password(size=32) }}
+		</p>
+		<p>
+			{{ form.confirm.label }}<br>
+			{{ form.confirm(size=32) }}
+		</p>
+		<p>
+			{{ form.address.label }}<br>
+			{{ form.adress(size=32) }}
+		</p>
+		<p>
+			{{ form.latitude.label }}<br>
+			{{ form.latitude(size=32) }}
+		</p>
+		<p>
+			{{ form.longitude.label }}<br>
+			{{ form.longitude(size=32) }}
+		</p>
+		<p>
+			{{ form.profile.label }}<br>
+			{{ form.profile(size=64) }}
+		</p>
+		<p>
+			{{ form.photo.label }}<br>
+			{{ form.photo(size=64) }}
+		</p>
+		<p>{{ form.submit() }}</p>
+	</form>
+{% endblock %}
