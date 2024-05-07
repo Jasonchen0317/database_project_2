@@ -28,11 +28,7 @@
 		</p>
 		<p>
 			{{ form.profile.label }}<br>
-			{{ form.profile(size=64) }}
-		</p>
-		<p>
-			{{ form.photo.label }}<br>
-			{{ form.photo(size=64) }}
+			{{ form.profile(rows='20',cols='60') }}
 		</p>
 		<p>{{ form.submit() }}</p>
 	</form>

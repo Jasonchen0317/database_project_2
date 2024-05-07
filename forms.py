@@ -23,7 +23,7 @@ class EditForm(FlaskForm):
 
 class ThreadForm(FlaskForm):
     title = StringField('Title', validators=[])
-    target = SelectField('Target', choices=[('F', 'friend'), ('N', 'neighbor'), ('H', 'hood'), ('B', 'block')])
+    target = SelectField('Target', choices=[('friend', 'Friend'), ('neighbor', 'Neighbor'), ('hood', 'Hood'), ('block', 'Block')])
     rid=StringField('Recipient', validators=[])
     latitude = StringField('Latitude', validators=[])
     longitude = StringField('Longitude', validators=[])
@@ -31,7 +31,6 @@ class ThreadForm(FlaskForm):
     submit = SubmitField('Post')
    
 class ReplyForm(FlaskForm):
-    title = StringField('Title', validators=[])
-    body = TextAreaField('body', validators=[])
-    submit = SubmitField('Post')
+    body = TextAreaField('Reply', validators=[])
+    submit = SubmitField('Reply')
     

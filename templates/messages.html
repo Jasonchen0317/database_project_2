@@ -2,8 +2,15 @@
 {% block content %}
     {% for m in messages %}
         <div class="message">
-            <h3>Message ID: {{ m[0] }} - Title: {{ m[5] }}</h3>
+            <h3>ID: {{ m[3] }}: {{ m[5] }}</h3>
         </div>
     {% endfor %}
-    
+    <form action="" method="post" novalidate>
+		{{ form.hidden_tag() }}
+		<p>
+			{{ form.body.label }}<br>
+			{{ form.body(rows='20',cols='60') }}
+		</p>
+		<p>{{ form.submit() }}</p>
+	</form>
 {% endblock %}

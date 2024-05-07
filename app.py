@@ -29,7 +29,7 @@ def login():
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(
-            'SELECT * FROM project_schema.users WHERE username = %s AND password = %s', 
+            'SELECT * FROM project_schema.users WHERE username = %s AND password = %s;', 
             (username, password,)
         )
         # Fetch one record and return result
@@ -42,6 +42,15 @@ def login():
             session['loggedin'] = True
             session['id'] = account[0]
             session['username'] = account[1]
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                'insert into project_schema.useractivity(userid, lastaccesstimestamp) values(%s, CURRENT_TIMESTAMP) on conflict(userid) do update set lastaccesstimestamp=CURRENT_TIMESTAMP;', 
+                (session['id'],)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
             # Redirect to home page
             return redirect(url_for('index'))
         else:
@@ -66,14 +75,14 @@ def register():
         if password==confirm:
             conn = get_db_connection()
             cur = conn.cursor()
-            cur.execute('SELECT * FROM project_schema.users WHERE username = %s', (username,))
+            cur.execute('SELECT * FROM project_schema.users WHERE username = %s;', (username,))
             account = cur.fetchone()
             if account:
                 msg = 'Account already exists!'
             else:
                 # Account doesn't exist, and the form data is valid, so insert the new account into the accounts table
                 cur.execute(
-                    'INSERT INTO project_schema.users(userid, username, password, address, latitude, longitude, profile, photo) VALUES ((select max(userid)+1 from project_schema.users), %s, %s, %s, %s, %s, %s)',
+                    'INSERT INTO project_schema.users(userid, username, password, address, latitude, longitude, profile, photo) VALUES ((select max(userid)+1 from project_schema.users), %s, %s, %s, %s, %s, %s);',
                     (username, password, address, latitude, longitude, profile,)
                 )
                 conn.commit()
@@ -114,9 +123,14 @@ def profile():
             (session['id'],)
         )
         profile = cur.fetchone()
+        cur.execute(
+            'SELECT * FROM project_schema.useractivity where userid=%s;',
+            (session['id'],)
+        )
+        logintime = cur.fetchone()
         cur.close()
         conn.close()
-        return render_template('profile.html', profile=profile)
+        return render_template('profile.html', profile=profile, logintime=logintime)
     return redirect(url_for('login'))
 
 @app.route('/editprofile/', methods=['GET', 'POST'])
@@ -199,13 +213,21 @@ def threads():
 
 @app.route('/messages/<id>', methods=['GET', 'POST'])
 def messages(id):
+    form = ReplyForm()
     if 'loggedin' in session:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute('SELECT * FROM project_schema.messages where threadid=%s;',(id,))
         m = cur.fetchall()
-        cur.close()
-        conn.close()
-        return render_template('messages.html', messages=m)
+        if form.validate_on_submit():
+            cur.execute(
+                'insert into project_schema.messages(threadid, authorid, timestamp, body) values(%s, %s, CURRENT_TIMESTAMP, %s)',
+                (id, session['id'], form.body.data)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+            return redirect(url_for('messages', id=id))
+        return render_template('messages.html', messages=m, form=form)
     return redirect(url_for('login'))
 
