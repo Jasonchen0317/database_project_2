@@ -11,7 +11,7 @@ class SignUpForm(FlaskForm):
     latitude = StringField('Latitude', validators=[])
     longitude = StringField('Longitude', validators=[])
     profile = TextAreaField('Profile', validators=[])
-    submit = SubmitField('Sign In')
+    submit = SubmitField('Sign Up')
     
     
 class EditForm(FlaskForm):

@@ -82,7 +82,7 @@ def register():
             else:
                 # Account doesn't exist, and the form data is valid, so insert the new account into the accounts table
                 cur.execute(
-                    'INSERT INTO project_schema.users(userid, username, password, address, latitude, longitude, profile, photo) VALUES ((select max(userid)+1 from project_schema.users), %s, %s, %s, %s, %s, %s);',
+                    'INSERT INTO project_schema.users(userid, username, password, address, latitude, longitude, profile) VALUES ((select max(userid)+1 from project_schema.users), %s, %s, %s, %s, %s, %s);',
                     (username, password, address, latitude, longitude, profile,)
                 )
                 conn.commit()
