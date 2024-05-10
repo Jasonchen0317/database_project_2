@@ -22,15 +22,19 @@ class EditForm(FlaskForm):
     submit = SubmitField('Update')
 
 class ThreadForm(FlaskForm):
-    title = StringField('Title', validators=[])
+    title = StringField('Title', validators=[DataRequired()])
     target = SelectField('Target', choices=[('friend', 'Friend'), ('neighbor', 'Neighbor'), ('hood', 'Hood'), ('block', 'Block')])
-    rid=StringField('Recipient', validators=[])
+    rid=StringField('Recipient', validators=[DataRequired()])
     latitude = StringField('Latitude', validators=[])
     longitude = StringField('Longitude', validators=[])
     body=TextAreaField('Body', validators=[])
     submit = SubmitField('Post')
    
 class ReplyForm(FlaskForm):
-    body = TextAreaField('Reply', validators=[])
+    body = TextAreaField('Reply', validators=[DataRequired()])
     submit = SubmitField('Reply')
     
+class BlockForm(FlaskForm):
+    join = SelectField('Join or Follow', choices=[('true', 'Join'), ('false', 'Follow')], validators=[DataRequired()])
+    blockid = SelectField('Block', choices=[], validators=[DataRequired()])
+    submit = SubmitField('Send')

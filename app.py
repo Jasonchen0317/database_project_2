@@ -4,7 +4,7 @@ from flask import Flask, render_template, request, url_for, redirect, session, f
 from wtforms import StringField, PasswordField, SubmitField, DateField, SelectField
 from flask_wtf import FlaskForm
 from wtforms.validators import DataRequired
-from forms import SignUpForm, EditForm, ThreadForm, ReplyForm
+from forms import SignUpForm, EditForm, ThreadForm, ReplyForm, BlockForm
 from utils import is_number
 app = Flask(__name__)
 app.secret_key = 'yoursecretkey'
@@ -240,3 +240,74 @@ def messages(id):
         return render_template('messages.html', messages=m, form=form)
     return redirect(url_for('login'))
 
+@app.route('/blocks/', methods=['GET', 'POST'])
+def blocks():
+    if 'loggedin' in session:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        #Fetch joined block
+        cur.execute(
+            'SELECT b.blockid, b.name FROM project_schema.userblocks ub, project_schema.blocks b WHERE ub.blockid = b.blockid and userid=%s and isjoined=true;',
+            (session['id'],)
+        )
+        jb = cur.fetchall()
+        #Fetch followed block
+        cur.execute(
+            'SELECT b.blockid, b.name FROM project_schema.userblocks ub, project_schema.blocks b WHERE ub.blockid = b.blockid and userid=%s and isjoined=false;',
+            (session['id'],)
+        )
+        fb = cur.fetchall()
+        cur.close()
+        conn.close()
+        return render_template('blocks.html', joinedblock=jb, followedblock=fb)
+    return redirect(url_for('login'))
+
+@app.route('/joinblocks/', methods=['GET', 'POST'])
+def joinblocks():
+    msg = ''
+    form = BlockForm()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM project_schema.blocks;')
+    blocks=cur.fetchall()
+    cur.close()
+    conn.close()
+    #Get block name and id
+    blocklist=[(b[0], b[1]) for b in blocks]
+    form.blockid.choices=blocklist
+    if form.validate_on_submit():
+        blockid = form.blockid.data
+        join=form.join.data
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM project_schema.userblocks where userid=%s and isjoined=true;', (session['id'],))
+        joined=cur.fetchone()
+        cur.execute('SELECT * FROM project_schema.userblocks where userid=%s and blockid=%s;', (session['id'], blockid))
+        followedorjoined=cur.fetchone()
+        cur.close()
+        conn.close()
+        #Check if user has joined a block
+        if joined and join=='true':
+            msg='Already joined a block!'
+        #Check if the target block is already followed
+        elif followedorjoined:
+            msg='Block already followed or joined!'
+        #Insert to blockrequests for join/ Insert to userblocks for follow
+        else:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            if join=='true':
+                cur.execute(
+                    'INSERT INTO project_schema.blockrequests(requestid, senderid, blockid, approvedcount) VALUES ((select max(requestid)+1 from project_schema.blockrequests), %s, %s, 0) ON CONFLICT (senderid, blockid) DO NOTHING;',
+                    (session['id'], blockid)
+                )
+            else:
+                cur.execute(
+                    'INSERT INTO project_schema.userblocks(userid, blockid, isjoined) VALUES (%s, %s, %s);',
+                    (session['id'], blockid, join)
+                )
+            conn.commit()
+            cur.close()
+            conn.close()
+            return redirect(url_for('blocks'))
+    return render_template('joinblocks.html', msg=msg, form=form)

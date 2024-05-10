@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block content %}
+    <h1>{% block title %}Your Blocks{% endblock %}</h1>
+
+    <h3>-Joined block-</h3>
+    {% for b in joinedblock %}
+        <p>Block ID: {{ b[0] }} - Name: {{ b[1] }}</p>
+    {% endfor %}
+
+    <h3>-Followed blocks-</h3>
+    {% for b in followedblock %}
+        <p>Block ID: {{ b[0] }} - Name: {{ b[1] }}</p>
+    {% endfor %}
+
+    <div class="links">
+        <a href="{{ url_for('joinblocks') }}" class="active">Join or Follow New Blocks</a>
+    </div>
+{% endblock %}
