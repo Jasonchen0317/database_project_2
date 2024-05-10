@@ -5,6 +5,7 @@ from wtforms import StringField, PasswordField, SubmitField, DateField, SelectFi
 from flask_wtf import FlaskForm
 from wtforms.validators import DataRequired
 from forms import SignUpForm, EditForm, ThreadForm, ReplyForm
+from utils import is_number
 app = Flask(__name__)
 app.secret_key = 'yoursecretkey'
 
@@ -72,7 +73,7 @@ def register():
         latitude = form.latitude.data
         longitude = form.longitude.data
         profile = form.profile.data
-        if password==confirm:
+        if password==confirm and is_number(latitude) and is_number(longitude):
             conn = get_db_connection()
             cur = conn.cursor()
             cur.execute('SELECT * FROM project_schema.users WHERE username = %s;', (username,))
@@ -90,6 +91,8 @@ def register():
                 conn.close()
                 msg = 'You have successfully registered!'
                 return redirect(url_for('login'))
+        else:
+            msg = 'Invalid Input!'
     elif request.method == 'POST':
         # Form is empty... (no POST data)
         msg = 'Please fill out the form!'   
@@ -135,6 +138,7 @@ def profile():
 
 @app.route('/editprofile/', methods=['GET', 'POST'])
 def editprofile():
+    msg=''
     if 'loggedin' in session:
         form = EditForm()
         if request.method=='POST':
@@ -155,18 +159,23 @@ def editprofile():
             conn.close()
             return render_template('editprofile.html', form=form)
         if form.validate_on_submit():
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute(
-                'update project_schema.users set address=%s, latitude=%s, longitude=%s, profile=%s where userid=%s',
-                (form.address.data, form.latitude.data, form.longitude.data, form.profile.data, session['id'],)
-            )
-            conn.commit()
-            cur.close()
-            conn.close()
-            flash('Update Successfully!')
-            return redirect(url_for('profile'))
-        return render_template('editprofile.html', title='Edit Account', form=form)
+            lat=form.latitude.data
+            long=form.longitude.data
+            if is_number(lat) and is_number(long):
+                conn = get_db_connection()
+                cur = conn.cursor()
+                cur.execute(
+                    'update project_schema.users set address=%s, latitude=%s, longitude=%s, profile=%s where userid=%s',
+                    (form.address.data, form.latitude.data, form.longitude.data, form.profile.data, session['id'],)
+                )
+                conn.commit()
+                cur.close()
+                conn.close()
+                flash('Update Successfully!')
+                return redirect(url_for('profile'))
+            else:
+                msg = 'Invalid Input!'
+        return render_template('editprofile.html', title='Edit Account', form=form, msg=msg)
     
 
 @app.route('/postthread/', methods=['GET', 'POST'])
