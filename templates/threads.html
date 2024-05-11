@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
-    <h1>{% block title %} Home Page{% endblock %}</h1>
-    <p>Welcome back, {{ username }}!</p>
+    <h1>{% block title %} My Threads{% endblock %}</h1>
     {% for t in threads %}
         <div class='Threads'>
             <h3>Thread ID: {{ t[0] }} - Title: {{ t[5] }}</h3>

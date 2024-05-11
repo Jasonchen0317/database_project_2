@@ -18,7 +18,6 @@ def get_db_connection():
     return conn
 
 
-
 @app.route('/', methods=('GET', 'POST'))
 def login():
     msg = ''
@@ -65,6 +64,7 @@ def register():
     # Output message if something goes wrong...
     msg = ''
     form = SignUpForm()
+    #Submit form
     if form.validate_on_submit():
         username = form.username.data
         password = form.password.data
@@ -73,6 +73,7 @@ def register():
         latitude = form.latitude.data
         longitude = form.longitude.data
         profile = form.profile.data
+        #Check if input is valid
         if password==confirm and is_number(latitude) and is_number(longitude):
             conn = get_db_connection()
             cur = conn.cursor()
@@ -118,6 +119,7 @@ def index():
 
 @app.route('/profile/')
 def profile():
+    #Fetch user profile if logged in
     if 'loggedin' in session:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -144,6 +146,7 @@ def editprofile():
         if request.method=='POST':
             print('check data and submit')
         else:
+            #Fetch user profile to put in form
             conn = get_db_connection()
             cur = conn.cursor()
             cur.execute(
@@ -159,6 +162,7 @@ def editprofile():
             conn.close()
             return render_template('editprofile.html', form=form)
         if form.validate_on_submit():
+            #update profile if input is valid
             lat=form.latitude.data
             long=form.longitude.data
             if is_number(lat) and is_number(long):
@@ -180,6 +184,7 @@ def editprofile():
 
 @app.route('/postthread/', methods=['GET', 'POST'])
 def postthread():
+    #Insert into both thread and message table
     form = ThreadForm()
     if 'loggedin' in session:
         if form.validate_on_submit():
@@ -210,6 +215,7 @@ def postthread():
             
 @app.route('/threads/', methods=['GET', 'POST'])
 def threads():
+    #Fetch threads(not finished)
     if 'loggedin' in session:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -222,6 +228,7 @@ def threads():
 
 @app.route('/messages/<id>', methods=['GET', 'POST'])
 def messages(id):
+    #Fetch messages from thread with id, and reply
     form = ReplyForm()
     if 'loggedin' in session:
         conn = get_db_connection()
@@ -257,9 +264,15 @@ def blocks():
             (session['id'],)
         )
         fb = cur.fetchall()
+        #Fetch Requested block
+        cur.execute(
+            'SELECT blockid, approvedcount from project_schema.blockrequests where senderid=%s;',
+            (session['id'],)
+        )
+        requests = cur.fetchall()
         cur.close()
         conn.close()
-        return render_template('blocks.html', joinedblock=jb, followedblock=fb)
+        return render_template('blocks.html', joinedblock=jb, followedblock=fb, requests=requests)
     return redirect(url_for('login'))
 
 @app.route('/joinblocks/', methods=['GET', 'POST'])
@@ -284,24 +297,32 @@ def joinblocks():
         joined=cur.fetchone()
         cur.execute('SELECT * FROM project_schema.userblocks where userid=%s and blockid=%s;', (session['id'], blockid))
         followedorjoined=cur.fetchone()
+        cur.execute('SELECT * FROM project_schema.blockrequests where senderid=%s and blockid=%s;', (session['id'], blockid))
+        request=cur.fetchone()
         cur.close()
         conn.close()
         #Check if user has joined a block
         if joined and join=='true':
             msg='Already joined a block!'
-        #Check if the target block is already followed
+        #Check if the target block is already followed or joined
         elif followedorjoined:
             msg='Block already followed or joined!'
+        #Check if request is sent
+        elif request:
+            msg='Already sent a request!'
+        
         #Insert to blockrequests for join/ Insert to userblocks for follow
         else:
             conn = get_db_connection()
             cur = conn.cursor()
             if join=='true':
+                #Insert into blockrequests if join block
                 cur.execute(
-                    'INSERT INTO project_schema.blockrequests(requestid, senderid, blockid, approvedcount) VALUES ((select max(requestid)+1 from project_schema.blockrequests), %s, %s, 0) ON CONFLICT (senderid, blockid) DO NOTHING;',
+                    'INSERT INTO project_schema.blockrequests(requestid, senderid, blockid, approvedcount) VALUES ((select max(requestid)+1 from project_schema.blockrequests), %s, %s, 0)',
                     (session['id'], blockid)
                 )
             else:
+                #Insert into userblocks if follow block(no need to wait for approve)
                 cur.execute(
                     'INSERT INTO project_schema.userblocks(userid, blockid, isjoined) VALUES (%s, %s, %s);',
                     (session['id'], blockid, join)
@@ -311,3 +332,60 @@ def joinblocks():
             conn.close()
             return redirect(url_for('blocks'))
     return render_template('joinblocks.html', msg=msg, form=form)
+
+@app.route('/viewrequests/', methods=['GET', 'POST'])
+def viewrequests():
+    #view requests for user's joined block
+    msg=''
+    conn = get_db_connection()
+    cur = conn.cursor()
+    #get the user's joined block
+    cur.execute('SELECT blockid FROM project_schema.userblocks where userid=%s and isjoined=true;',(session['id'],))
+    userblock = cur.fetchone()
+    #Fetch the requests if user did joined a block, else redirect to blocks page
+    if userblock:
+        cur.execute('SELECT * FROM project_schema.blockrequests where blockid=%s and approvedcount<3;',(userblock[0],))
+        requests = cur.fetchall()
+    else:
+        return redirect(url_for('blocks'))
+    cur.close()
+    conn.close()
+    return render_template('viewrequests.html', msg=msg, requests = requests)
+
+@app.route('/approverequests/<id>')
+def approverequests(id):
+    msg=''
+    conn = get_db_connection()
+    cur = conn.cursor()
+    #Check if user have approved this request before
+    cur.execute('SELECT * FROM project_schema.requestapprovals where approverid=%s and requestid=%s;',(session['id'], id,))
+    approval = cur.fetchone()
+    if approval:
+        msg='Already approved'
+    else:
+        #Insert approval record
+        cur.execute(
+            'INSERT INTO project_schema.requestapprovals(approvalid, requestid, approverid) VALUES ((select max(approvalid)+1 from project_schema.requestapprovals), %s, %s);',
+            (id, session['id'],)
+        )
+        conn.commit()
+        #Fetch the details of this request
+        cur.execute('SELECT * from project_schema.blockrequests where requestid=%s;', (id,))
+        r=cur.fetchone()
+        senderid = r[1]
+        blockid = r[2]
+        approvalcount=r[3]
+        
+        if approvalcount==2:
+            #Sender joins the block if approvedcount gets to 3 (2+this one)
+            cur.execute(
+                    'INSERT INTO project_schema.userblocks(userid, blockid, isjoined) VALUES (%s, %s, true);',
+                    (senderid, blockid,)
+            )
+            conn.commit()
+        #Update approvedcount
+        cur.execute('UPDATE project_schema.blockrequests SET approvedcount=approvedcount+1 where requestid=%s;', (id,))
+        conn.commit()
+    cur.close()
+    conn.close()
+    return redirect(url_for('viewrequests', msg=msg))
