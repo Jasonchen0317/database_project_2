@@ -314,6 +314,7 @@ def messages(id, target):
             if isjoin:
                 return render_template('messages.html', messages=m, form=form, msg=msg)
             else:
+                msg='Only joined member can reply to this thread.'
                 return render_template('messagesnoreply.html', messages=m, msg=msg)
         #Can reply to any other
         else:
@@ -331,6 +332,12 @@ def blocks():
             (session['id'],)
         )
         jb = cur.fetchall()
+        #Fetch joined hood
+        cur.execute(
+            'SELECT n.neighborhoodid, name FROM (select userid, neighborhoodid from project_schema.userblocks ub, project_schema.blocks b WHERE ub.blockid = b.blockid and userid=%s and isjoined=true) un, project_schema.neighborhoods n where un.neighborhoodid=n.neighborhoodid;',
+            (session['id'],)
+        )
+        hood = cur.fetchone()
         #Fetch followed block
         cur.execute(
             'SELECT b.blockid, b.name FROM project_schema.userblocks ub, project_schema.blocks b WHERE ub.blockid = b.blockid and userid=%s and isjoined=false;',
@@ -345,7 +352,7 @@ def blocks():
         requests = cur.fetchall()
         cur.close()
         conn.close()
-        return render_template('blocks.html', joinedblock=jb, followedblock=fb, requests=requests)
+        return render_template('blocks.html', joinedblock=jb, followedblock=fb,hood=hood, requests=requests)
     return redirect(url_for('login'))
 
 @app.route('/joinblocks/', methods=['GET', 'POST'])
