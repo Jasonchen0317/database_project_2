@@ -2,13 +2,16 @@
 {% block content %}
     <h1>{% block title %} My Threads{% endblock %}</h1>
     <div class="links">
-        <a href="{{ url_for('threads', source='all') }}" class="active">RAll Threads</a>
+        <a href="{{ url_for('threads', source='all') }}" class="active">All Threads</a>
         <a href="{{ url_for('threads', source='new') }}">New Threads</a>
         <a href="{{ url_for('threads', source='my') }}">My Threads</a>
         <a href="{{ url_for('threads', source='friend') }}">Friend Threads</a>
         <a href="{{ url_for('threads', source='neighbor') }}">Neighbor Threads</a>
         <a href="{{ url_for('threads', source='block') }}">Block Threads</a>
         <a href="{{ url_for('threads', source='hood') }}">Hood Threads</a>
+    </div>
+    <div class="links">
+        <a href="{{ url_for('postthread') }}" class="active">Create Thread</a>
     </div>
     <div>{{ msg }}</div>
     {% for t in threads %}
@@ -18,7 +21,5 @@
             <a href="{{ url_for('messages', id=t[0], target=t[3]) }}" class="active">more</a>
         </div>
     {% endfor %}
-    <div class="links">
-        <a href="{{ url_for('postthread') }}" class="active">Create Thread</a>
-    </div>
+    
 {% endblock %}

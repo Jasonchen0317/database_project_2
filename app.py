@@ -230,6 +230,8 @@ def postthread():
                 msg="You're not friend with this user!"
             elif target=='neighbor' and not isneighbor:
                 msg="You're not neighbor with this user!"
+            elif not is_number(lat) or not is_number(long):
+                msg='Invalid location'
             else:
                 cur.execute(
                     'insert into project_schema.threads(title, locationlatitude, locationlongitude, recipientid, target) values(%s, %s, %s, %s, %s)', 
@@ -245,7 +247,7 @@ def postthread():
                 conn.close()
                 flash('Post Successfully!')
                 return redirect(url_for('threads', source='my'))
-        else:
+        elif request.method == 'POST':
             msg='invalid post'    
         return render_template('post.html', form=form, msg=msg)
 
@@ -359,7 +361,7 @@ def messages(id, target):
                 return render_template('messagesnoreply.html', messages=m, msg=msg)
         #Can reply to any other
         else:
-            return render_template('messages.html', messages=m, form=form, msg=msg)
+            return render_template('messages.html', messages=m, form=form, msg=msg, username=session['username'])
     return redirect(url_for('login'))
 
 @app.route('/blocks/', methods=['GET', 'POST'])
