@@ -1,8 +1,12 @@
 from flask import Flask, render_template, request, url_for, redirect, session
 from wtforms import StringField, PasswordField, SubmitField, DateField, SelectField, HiddenField, TextAreaField, FileField
 from flask_wtf import FlaskForm
-from wtforms.validators import DataRequired
+from wtforms.validators import DataRequired, ValidationError
 
+def isinteger(form, field):
+    if not field.data.isdigit():
+        raise ValidationError('invalid')
+    
 class SignUpForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired()])
     password = PasswordField('Password', validators=[DataRequired()])
@@ -24,7 +28,7 @@ class EditForm(FlaskForm):
 class ThreadForm(FlaskForm):
     title = StringField('Title', validators=[DataRequired()])
     target = SelectField('Target', choices=[('friend', 'Friend'), ('neighbor', 'Neighbor'), ('hood', 'Hood'), ('block', 'Block')])
-    rid=StringField('Recipient', validators=[DataRequired()])
+    rid=StringField('Recipient', validators=[DataRequired(), isinteger])
     latitude = StringField('Latitude', validators=[])
     longitude = StringField('Longitude', validators=[])
     body=TextAreaField('Body', validators=[])

@@ -197,12 +197,31 @@ def postthread():
             body = form.body.data
             conn = get_db_connection()
             cur = conn.cursor()
+            #Check if recipient is valid
             cur.execute(
-                    "SELECT * FROM project_schema.userblocks where blockid = %s and userid=%s and isjoined=true;",
+                    "SELECT * FROM project_schema.userblocks where blockid=%s and userid=%s and isjoined=true;",
                     (rid, session['id'],))
             joinedblock = cur.fetchone()
+            cur.execute(
+                    "SELECT * FROM (select * from project_schema.userblocks where isjoined=true) ub, project_schema.blocks b where b.blockid=ub.blockid and neighborhoodid = %s and userid=%s;",
+                    (rid, session['id'],))
+            joinedhood = cur.fetchone()
+            cur.execute(
+                    "SELECT * FROM project_schema.userfriends where userid1 = %s and userid2=%s;",
+                    (rid, session['id'],))
+            isfriend = cur.fetchone()
+            cur.execute(
+                    "SELECT * FROM project_schema.userneighbors where userid1 = %s and userid2=%s;",
+                    (rid, session['id'],))
+            isneighbor = cur.fetchone()
             if target=='block' and not joinedblock:
                 msg="You're not joined in this block!"
+            elif target=='hood' and not joinedhood:
+                msg="You're not joined in this hood!"
+            elif target=='friend' and not isfriend:
+                msg="You're not friend with this user!"
+            elif target=='neighbor' and not isneighbor:
+                msg="You're not neighbor with this user!"
             else:
                 cur.execute(
                     'insert into project_schema.threads(title, locationlatitude, locationlongitude, recipientid, target) values(%s, %s, %s, %s, %s)', 
@@ -218,6 +237,8 @@ def postthread():
                 conn.close()
                 flash('Post Successfully!')
                 return redirect(url_for('threads', source='my'))
+        else:
+            msg='invalid post'    
         return render_template('post.html', form=form, msg=msg)
 
             
