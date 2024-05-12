@@ -185,6 +185,7 @@ def editprofile():
 @app.route('/postthread/', methods=['GET', 'POST'])
 def postthread():
     #Insert into both thread and message table
+    msg=''
     form = ThreadForm()
     if 'loggedin' in session:
         if form.validate_on_submit():
@@ -197,44 +198,83 @@ def postthread():
             conn = get_db_connection()
             cur = conn.cursor()
             cur.execute(
-                'insert into project_schema.threads(title, locationlatitude, locationlongitude, recipientid, target) values(%s, %s, %s, %s, %s)', 
-                (title, lat, long, rid, target)
-            )
-            conn.commit()
-            cur.execute(
-                'insert into project_schema.messages(threadid, authorid, timestamp, body) values((select max(threadid) from project_schema.threads), %s, CURRENT_TIMESTAMP, %s)',
-                (session['id'], body)
-            )
-            conn.commit()
-            cur.close()
-            conn.close()
-            flash('Post Successfully!')
-            return redirect(url_for('index'))
-        return render_template('post.html', form=form)
+                    "SELECT * FROM project_schema.userblocks where blockid = %s and userid=%s and isjoined=true;",
+                    (rid, session['id'],))
+            joinedblock = cur.fetchone()
+            if target=='block' and not joinedblock:
+                msg="You're not joined in this block!"
+            else:
+                cur.execute(
+                    'insert into project_schema.threads(title, locationlatitude, locationlongitude, recipientid, target) values(%s, %s, %s, %s, %s)', 
+                    (title, lat, long, rid, target)
+                )
+                conn.commit()
+                cur.execute(
+                    'insert into project_schema.messages(threadid, authorid, timestamp, body) values((select max(threadid) from project_schema.threads), %s, CURRENT_TIMESTAMP, %s)',
+                    (session['id'], body)
+                )
+                conn.commit()
+                cur.close()
+                conn.close()
+                flash('Post Successfully!')
+                return redirect(url_for('threads', source='my'))
+        return render_template('post.html', form=form, msg=msg)
 
             
-@app.route('/threads/', methods=['GET', 'POST'])
-def threads():
+@app.route('/threads/<source>', methods=['GET', 'POST'])
+def threads(source):
+    threads=[]
     #Fetch threads(not finished)
     if 'loggedin' in session:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute('SELECT * FROM project_schema.threads where recipientid=%s;',(session['id'],))
-        threads = cur.fetchall()
+        if source=='all':
+            cur.execute('SELECT * FROM project_schema.threads where recipientid=%s;',(session['id'],))
+            threads = cur.fetchall()
+            cur.execute(
+                "SELECT * FROM project_schema.threads t, project_schema.userblocks ub where t.recipientid=ub.blockid and userid=%s and target='block';"
+                ,(session['id'],)
+            )
+            bthreads = cur.fetchall()
+            threads=threads+bthreads
+        elif source=='my':
+            cur.execute('SELECT * FROM project_schema.threads t, project_schema.messages m where t.threadid = m.threadid and m.authorid=%s;',(session['id'],))
+            threads = cur.fetchall()        
+        elif source=='friend':
+            cur.execute("SELECT * FROM project_schema.threads where recipientid=%s and target=%s",(session['id'], source))
+            threads = cur.fetchall()
+        elif source=='neighbor':
+            cur.execute("SELECT * FROM project_schema.threads where recipientid=%s and target=%s",(session['id'], source))
+            threads = cur.fetchall()
+        elif source=='block':
+            cur.execute(
+                "SELECT * FROM project_schema.threads t, project_schema.userblocks ub where t.recipientid=ub.blockid and userid=%s and target=%s;"
+                ,(session['id'], source)
+            )
+            threads = cur.fetchall()
+        elif source=='hood':
+            cur.execute(
+                "SELECT * FROM project_schema.threads t, (select ub.userid, neighborhoodid from project_schema.userblocks ub, project_schema.blocks b where ub.blockid=b.blockid and ub.isjoined=true) un where t.recipientid=un.neighborhoodid and userid=%s and target=%s;"
+                ,(session['id'], source)
+            )
+            threads = cur.fetchall()
         cur.close()
         conn.close()
         return render_template('threads.html', userid = session['id'], username=session['username'], threads=threads)
     return redirect(url_for('login'))
 
-@app.route('/messages/<id>', methods=['GET', 'POST'])
-def messages(id):
+@app.route('/messages/<id>/<target>', methods=['GET', 'POST'])
+def messages(id, target):
+    msg=''
     #Fetch messages from thread with id, and reply
     form = ReplyForm()
     if 'loggedin' in session:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute('SELECT * FROM project_schema.messages where threadid=%s;',(id,))
+        #Fetch all messages from thread with id
+        cur.execute('SELECT * FROM project_schema.messages m, project_schema.users u where m.authorid = u.userid and threadid=%s order by timestamp asc;',(id,))
         m = cur.fetchall()
+        
         if form.validate_on_submit():
             cur.execute(
                 'insert into project_schema.messages(threadid, authorid, timestamp, body) values(%s, %s, CURRENT_TIMESTAMP, %s)',
@@ -243,8 +283,20 @@ def messages(id):
             conn.commit()
             cur.close()
             conn.close()
-            return redirect(url_for('messages', id=id))
-        return render_template('messages.html', messages=m, form=form)
+            return redirect(url_for('messages', id=id, target=target))
+        #Check if user is joined or follow (can/cannot reply)
+        if target=='block':
+            cur.execute(
+                'SELECT * FROM project_schema.userblocks where blockid = (select recipientid from project_schema.threads where threadid=%s) and userid=%s and isjoined=true;',
+                (id, session['id'],))
+            isjoin = cur.fetchone()
+            if isjoin:
+                return render_template('messages.html', messages=m, form=form, msg=msg)
+            else:
+                return render_template('messagesnoreply.html', messages=m, msg=msg)
+        #Can reply to any other
+        else:
+            return render_template('messages.html', messages=m, form=form, msg=msg)
     return redirect(url_for('login'))
 
 @app.route('/blocks/', methods=['GET', 'POST'])
@@ -308,7 +360,7 @@ def joinblocks():
         elif followedorjoined:
             msg='Block already followed or joined!'
         #Check if request is sent
-        elif request:
+        elif request and join=='true':
             msg='Already sent a request!'
         
         #Insert to blockrequests for join/ Insert to userblocks for follow
@@ -344,13 +396,16 @@ def viewrequests():
     userblock = cur.fetchone()
     #Fetch the requests if user did joined a block, else redirect to blocks page
     if userblock:
-        cur.execute('SELECT * FROM project_schema.blockrequests where blockid=%s and approvedcount<3;',(userblock[0],))
+        cur.execute(
+            'SELECT * FROM project_schema.blockrequests br where blockid=%s and approvedcount<3 and not exists(select * from project_schema.requestapprovals r where approverid=%s and r.requestid=br.requestid);'
+            ,(userblock[0], session['id'],)
+        )
         requests = cur.fetchall()
     else:
         return redirect(url_for('blocks'))
     cur.close()
     conn.close()
-    return render_template('viewrequests.html', msg=msg, requests = requests)
+    return render_template('viewrequests.html', msg=msg, requests=requests)
 
 @app.route('/approverequests/<id>')
 def approverequests(id):
@@ -377,9 +432,9 @@ def approverequests(id):
         approvalcount=r[3]
         
         if approvalcount==2:
-            #Sender joins the block if approvedcount gets to 3 (2+this one)
+            #If approvedcount reaches 3: 1. Insert sender to userblock with isjoined=true or 2. change to join if already followed the block
             cur.execute(
-                    'INSERT INTO project_schema.userblocks(userid, blockid, isjoined) VALUES (%s, %s, true);',
+                    'INSERT INTO project_schema.userblocks(userid, blockid, isjoined) VALUES (%s, %s, true) on conflict(userid, blockid) do update set isjoined=true;',
                     (senderid, blockid,)
             )
             conn.commit()

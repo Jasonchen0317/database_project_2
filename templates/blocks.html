@@ -2,20 +2,26 @@
 {% block content %}
     <h1>{% block title %}My Blocks{% endblock %}</h1>
 
-    <h3>-Joined block-</h3>
-    {% for b in joinedblock %}
-        <p>Block ID: {{ b[0] }} - Name: {{ b[1] }}</p>
-    {% endfor %}
-    <a href="{{ url_for('viewrequests') }}" class="active">Join Requests</a>
-    <h3>-Followed blocks-</h3>
-    {% for b in followedblock %}
-        <p>Block ID: {{ b[0] }} - Name: {{ b[1] }}</p>
-    {% endfor %}
-    <h3>-My Requests-</h3>
-    {% for r in requests %}
-        <p>Block ID: {{ r[0] }} - Approval Count: {{ r[1] }}</p>
-    {% endfor %}
-
+    <div class=block1>
+        <h3>-Joined block-</h3>
+        {% for b in joinedblock %}
+            <p>Block ID: {{ b[0] }} - Name: {{ b[1] }}</p>
+        {% endfor %}
+        <a href="{{ url_for('viewrequests') }}" class="active">Join Requests</a>
+    </div>
+    <div class=block1>
+        <h3>-Followed blocks-</h3>
+        {% for b in followedblock %}
+            <p>Block ID: {{ b[0] }} - Name: {{ b[1] }}</p>
+        {% endfor %}
+    </div>
+    <div class=block1>
+        <h3>-My Join Requests-</h3>
+        {% for r in requests %}
+            <p>Block ID: {{ r[0] }} - Approval Count: {{ r[1] }}</p>
+        {% endfor %}
+    </div>
+    
     <div class="links">
         <a href="{{ url_for('joinblocks') }}" class="active">Join or Follow New Blocks</a>
     </div>
