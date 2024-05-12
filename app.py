@@ -39,11 +39,19 @@ def login():
         # If account exists in accounts table in out database
         if account:
             # Create session data, we can access this data in other routes
+            session.permanent=False
             session['loggedin'] = True
             session['id'] = account[0]
             session['username'] = account[1]
             conn = get_db_connection()
             cur = conn.cursor()
+            # Fetch last login time
+            cur.execute(
+                'select lastaccesstimestamp from project_schema.useractivity where userid=%s;', 
+                (session['id'],)
+            )
+            session['lastlogintime']=cur.fetchone()[0]
+            # Update login time
             cur.execute(
                 'insert into project_schema.useractivity(userid, lastaccesstimestamp) values(%s, CURRENT_TIMESTAMP) on conflict(userid) do update set lastaccesstimestamp=CURRENT_TIMESTAMP;', 
                 (session['id'],)
@@ -245,19 +253,52 @@ def postthread():
 @app.route('/threads/<source>', methods=['GET', 'POST'])
 def threads(source):
     threads=[]
+    msg=''
     #Fetch threads(not finished)
     if 'loggedin' in session:
         conn = get_db_connection()
         cur = conn.cursor()
+        # All recieved threads
         if source=='all':
-            cur.execute('SELECT * FROM project_schema.threads where recipientid=%s;',(session['id'],))
+            # Personal threads
+            cur.execute("SELECT * FROM project_schema.threads where recipientid=%s and (target='friend' or target='neighbor');",(session['id'],))
             threads = cur.fetchall()
+            # Block threads
             cur.execute(
                 "SELECT * FROM project_schema.threads t, project_schema.userblocks ub where t.recipientid=ub.blockid and userid=%s and target='block';"
                 ,(session['id'],)
             )
             bthreads = cur.fetchall()
-            threads=threads+bthreads
+            # Neighborhood threads
+            cur.execute(
+                "SELECT * FROM project_schema.threads t, (select ub.userid, neighborhoodid from project_schema.userblocks ub, project_schema.blocks b where ub.blockid=b.blockid and ub.isjoined=true) un where t.recipientid=un.neighborhoodid and userid=%s and target='hood';"
+                ,(session['id'],)
+            )
+            nthreads = cur.fetchall()
+            threads=threads+bthreads+nthreads
+        # All new recieved threads
+        elif source=='new':
+            lastlogintime = str(session['lastlogintime'])
+            msg='Threads with messages after '+ lastlogintime
+            # Personal threads
+            cur.execute(
+                "SELECT * FROM project_schema.threads t where t.recipientid=%s and (target='friend' or target='neighbor') and exists(select * from project_schema.messages m where m.threadid=t.threadid and m.timestamp>%s);"
+                ,(session['id'], lastlogintime,))
+            threads = cur.fetchall()
+            # Block threads
+            cur.execute(
+                'SELECT * FROM project_schema.threads t, project_schema.userblocks ub where t.recipientid=ub.blockid and userid=%s and target=%s and exists(select * from project_schema.messages m where m.threadid=t.threadid and m.timestamp>%s);'
+                ,(session['id'], 'block', lastlogintime,)
+            )
+            bthreads = cur.fetchall()
+            # Neighborhood threads
+            cur.execute(
+                "SELECT * FROM project_schema.threads t, (select ub.userid, neighborhoodid from project_schema.userblocks ub, project_schema.blocks b where ub.blockid=b.blockid and ub.isjoined=true) un where t.recipientid=un.neighborhoodid and userid=%s and target='hood' and exists(select * from project_schema.messages m where m.threadid=t.threadid and m.timestamp>%s);"
+                ,(session['id'], lastlogintime,)
+            )
+            nthreads = cur.fetchall()
+            threads=threads+bthreads+nthreads
+        # All threads that user has left messages in
         elif source=='my':
             cur.execute('SELECT * FROM project_schema.threads t, project_schema.messages m where t.threadid = m.threadid and m.authorid=%s;',(session['id'],))
             threads = cur.fetchall()        
@@ -281,7 +322,7 @@ def threads(source):
             threads = cur.fetchall()
         cur.close()
         conn.close()
-        return render_template('threads.html', userid = session['id'], username=session['username'], threads=threads)
+        return render_template('threads.html', userid = session['id'], username=session['username'], msg=msg, threads=threads)
     return redirect(url_for('login'))
 
 @app.route('/messages/<id>/<target>', methods=['GET', 'POST'])
