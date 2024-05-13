@@ -12,8 +12,7 @@ class SignUpForm(FlaskForm):
     longitude = StringField('Longitude', validators=[])
     profile = TextAreaField('Profile', validators=[])
     submit = SubmitField('Sign In')
-    
-    
+
 class EditForm(FlaskForm):
     address = StringField('Address', validators=[])
     latitude = StringField('Latitude', validators=[])
@@ -29,7 +28,7 @@ class ThreadForm(FlaskForm):
     longitude = StringField('Longitude', validators=[])
     body=TextAreaField('Body', validators=[])
     submit = SubmitField('Post')
-   
+
 class ReplyForm(FlaskForm):
     body = TextAreaField('Reply', validators=[])
     submit = SubmitField('Reply')

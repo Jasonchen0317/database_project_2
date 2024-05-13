@@ -13,7 +13,7 @@ def get_db_connection():
     conn = psycopg2.connect(host='localhost',
                             database='postgres',
                             user='postgres',
-                            password='jason123')
+                            password='Hujiahong137')
     return conn
 
 
@@ -45,8 +45,8 @@ def login():
             conn = get_db_connection()
             cur = conn.cursor()
             cur.execute(
-                'insert into project_schema.useractivity(userid, lastaccesstimestamp) values(%s, CURRENT_TIMESTAMP) on conflict(userid) do update set lastaccesstimestamp=CURRENT_TIMESTAMP;', 
-                (session['id'],)
+                'insert into project_schema.useractivity(userid, lastaccesstimestamp) values (%s, CURRENT_TIMESTAMP) on conflict(userid) do update set lastaccesstimestamp=CURRENT_TIMESTAMP;', \
+                    (session['id'],)
             )
             conn.commit()
             cur.close()
@@ -81,19 +81,18 @@ def register():
                 msg = 'Account already exists!'
             else:
                 # Account doesn't exist, and the form data is valid, so insert the new account into the accounts table
-                cur.execute(
-                    'INSERT INTO project_schema.users(userid, username, password, address, latitude, longitude, profile, photo) VALUES ((select max(userid)+1 from project_schema.users), %s, %s, %s, %s, %s, %s);',
-                    (username, password, address, latitude, longitude, profile,)
-                )
+                cur.execute("INSERT INTO project_schema.users(userid, username, password, address, latitude, longitude, profile) VALUES (COALESCE((SELECT max(userid) + 1 FROM project_schema.users), 1), %s, %s, %s, %s, %s, %s);", \
+                            (username, password, address, latitude, longitude, profile,))
                 conn.commit()
                 cur.close()
                 conn.close()
                 msg = 'You have successfully registered!'
                 return redirect(url_for('login'))
+
     elif request.method == 'POST':
         # Form is empty... (no POST data)
-        msg = 'Please fill out the form!'   
-        
+        msg = 'Please fill out the form!'
+
     # Show registration form with message (if any)
     
     return render_template('register.html', msg=msg, form=form)
@@ -167,7 +166,6 @@ def editprofile():
             flash('Update Successfully!')
             return redirect(url_for('profile'))
         return render_template('editprofile.html', title='Edit Account', form=form)
-    
 
 @app.route('/postthread/', methods=['GET', 'POST'])
 def postthread():
@@ -198,7 +196,6 @@ def postthread():
             return redirect(url_for('index'))
         return render_template('post.html', form=form)
 
-            
 @app.route('/threads/', methods=['GET', 'POST'])
 def threads():
     if 'loggedin' in session:
