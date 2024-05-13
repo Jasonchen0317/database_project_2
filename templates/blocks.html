@@ -7,7 +7,9 @@
         {% for b in joinedblock %}
             <p>Block ID: {{ b[0] }} - Name: {{ b[1] }}</p>
         {% endfor %}
-        <p>Neighborhood ID: {{ hood[0] }} - Name: {{ hood[1] }}</p>
+        {% for h in hood %}
+            <p>Neighborhood ID: {{ h[0] }} - Name: {{ h[1] }}</p>
+        {% endfor %}
         <a href="{{ url_for('viewrequests') }}" class="active">Join Requests</a>
     </div>
     <div class=block1>

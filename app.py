@@ -259,10 +259,11 @@ def threads(source):
     threads=[]
     msg=''
     keyword='%%'
-    #Fetch threads(not finished)
+    # Fetch threads
     if 'loggedin' in session:
         conn = get_db_connection()
         cur = conn.cursor()
+        # Get keyword from search bar
         if form.validate_on_submit():
             keyword='%'+str(form.keyword.data)+'%'
         # All recieved threads
@@ -311,21 +312,25 @@ def threads(source):
         elif source=='my':
             cur.execute('SELECT * FROM project_schema.threads t where exists(select * from project_schema.messages m where t.threadid = m.threadid and m.authorid=%s) and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s));'
                         ,(session['id'], keyword, keyword,))
-            threads = cur.fetchall()        
+            threads = cur.fetchall() 
+        # Friend threads       
         elif source=='friend':
             cur.execute("SELECT * FROM project_schema.threads t where recipientid=%s and target=%s and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s))"
                         ,(session['id'], source, keyword, keyword,))
             threads = cur.fetchall()
+        # Neighbor Threads
         elif source=='neighbor':
             cur.execute("SELECT * FROM project_schema.threads t where recipientid=%s and target=%s and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s))"
                         ,(session['id'], source, keyword, keyword,))
             threads = cur.fetchall()
+        # Block threads
         elif source=='block':
             cur.execute(
                 "SELECT * FROM project_schema.threads t, project_schema.userblocks ub where t.recipientid=ub.blockid and userid=%s and target=%s and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s));"
                 ,(session['id'], source, keyword, keyword,)
             )
             threads = cur.fetchall()
+        # Neighborhood threads
         elif source=='hood':
             cur.execute(
                 "SELECT * FROM project_schema.threads t, (select ub.userid, neighborhoodid from project_schema.userblocks ub, project_schema.blocks b where ub.blockid=b.blockid and ub.isjoined=true) un where t.recipientid=un.neighborhoodid and userid=%s and target=%s and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s));"
@@ -341,12 +346,12 @@ def threads(source):
 @app.route('/messages/<id>/<target>', methods=['GET', 'POST'])
 def messages(id, target):
     msg=''
-    #Fetch messages from thread with id, and reply
+    # Fetch messages from threads with id, and reply
     form = ReplyForm()
     if 'loggedin' in session:
         conn = get_db_connection()
         cur = conn.cursor()
-        #Fetch all messages from thread with id
+        # Fetch all messages from thread with id
         cur.execute('SELECT * FROM project_schema.messages m, project_schema.users u where m.authorid = u.userid and threadid=%s order by timestamp asc;',(id,))
         m = cur.fetchall()
         
@@ -359,18 +364,19 @@ def messages(id, target):
             cur.close()
             conn.close()
             return redirect(url_for('messages', id=id, target=target))
-        #Check if user is joined or follow (can/cannot reply)
+        # Check if user is joined or follow to a block (can/cannot reply)
         if target=='block':
             cur.execute(
                 'SELECT * FROM project_schema.userblocks where blockid = (select recipientid from project_schema.threads where threadid=%s) and userid=%s and isjoined=true;',
                 (id, session['id'],))
             isjoin = cur.fetchone()
             if isjoin:
-                return render_template('messages.html', messages=m, form=form, msg=msg)
+                # Render template with reply form
+                return render_template('messages.html', messages=m, form=form, msg=msg, username=session['username'])
             else:
                 msg='Only joined member can reply to this thread.'
                 return render_template('messagesnoreply.html', messages=m, msg=msg)
-        #Can reply to any other
+        # User can reply to any other messages
         else:
             return render_template('messages.html', messages=m, form=form, msg=msg, username=session['username'])
     return redirect(url_for('login'))
@@ -391,7 +397,7 @@ def blocks():
             'SELECT n.neighborhoodid, name FROM (select userid, neighborhoodid from project_schema.userblocks ub, project_schema.blocks b WHERE ub.blockid = b.blockid and userid=%s and isjoined=true) un, project_schema.neighborhoods n where un.neighborhoodid=n.neighborhoodid;',
             (session['id'],)
         )
-        hood = cur.fetchone()
+        hood = cur.fetchall()
         #Fetch followed block
         cur.execute(
             'SELECT b.blockid, b.name FROM project_schema.userblocks ub, project_schema.blocks b WHERE ub.blockid = b.blockid and userid=%s and isjoined=false;',
@@ -415,7 +421,7 @@ def joinblocks():
     form = BlockForm()
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT * FROM project_schema.blocks;')
+    cur.execute('SELECT * FROM project_schema.blocks order by blockid;')
     blocks=cur.fetchall()
     cur.close()
     conn.close()
