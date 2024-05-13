@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block content %}
+    {% for m in messages %}
+        <div class="message">
+            <h3>{{ m[7] }}: {{ m[5] }}</h3>
+			<h5>Posted time: {{ m[4] }}</h5>
+        </div>
+    {% endfor %}
+	<div class=block1>{{ msg }}</div>
+{% endblock %}

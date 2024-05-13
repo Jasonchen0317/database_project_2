@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block content %}
+    <h1>{% block title %}Join or Follow Blocks{% endblock %}</h1>
+	<form action="" method="post">
+		{{ form.hidden_tag() }}
+		<p>
+			{{ form.join.label }}<br>
+			{{ form.join() }}
+		</p>
+		<p>
+			{{ form.blockid.label }}<br>
+			{{ form.blockid() }}
+		</p>
+		
+		<p>{{ form.submit() }}</p>
+	</form>
+	<div class="msg">{{ msg }}</div>
+{% endblock %}

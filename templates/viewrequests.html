@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+	<h1>{% block title %} Block Requests {% endblock %}</h1>
+    {% for r in requests %}
+        <div class="message">
+            <h3>Request ID: {{ r[0] }} Requested User: {{ r[1] }} Approval Count: {{ r[3] }}</h3>
+			<a href="{{ url_for('approverequests', id=r[0]) }}" class="active">Approve</a>
+        </div>
+    {% endfor %}
+    <div class="msg">{{ msg }}</div>
+{% endblock %}
