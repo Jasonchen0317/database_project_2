@@ -1,25 +1,29 @@
 {% extends 'base.html' %}
 {% block content %}
     <h1>{% block title %} My Threads{% endblock %}</h1>
-    <div class="links">
-        <a href="{{ url_for('threads', source='all') }}" class="active">All Threads</a>
-        <a href="{{ url_for('threads', source='new') }}">New Threads</a>
-        <a href="{{ url_for('threads', source='my') }}">My Threads</a>
-        <a href="{{ url_for('threads', source='friend') }}">Friend Threads</a>
-        <a href="{{ url_for('threads', source='neighbor') }}">Neighbor Threads</a>
-        <a href="{{ url_for('threads', source='block') }}">Block Threads</a>
-        <a href="{{ url_for('threads', source='hood') }}">Hood Threads</a>
+    <div>
+        <a class="btnblue" href="{{ url_for('threads', source='all') }}" class="active">All Threads</a>
+        <a class="btnblue" href="{{ url_for('threads', source='new') }}">New Threads</a>
+        <a class="btnblue" href="{{ url_for('threads', source='my') }}">My Threads</a>
+        <a class="btnblue" href="{{ url_for('threads', source='friend') }}">Friend Threads</a>
+        <a class="btnblue" href="{{ url_for('threads', source='neighbor') }}">Neighbor Threads</a>
+        <a class="btnblue" href="{{ url_for('threads', source='block') }}">Block Threads</a>
+        <a class="btnblue" href="{{ url_for('threads', source='hood') }}">Hood Threads</a>
+        <a class="btnblue" href="{{ url_for('postthread') }}" class="active">Create Thread</a>
     </div>
-    <div class="links">
-        <a href="{{ url_for('postthread') }}" class="active">Create Thread</a>
+    <div class='searchbar'>
+        <form action="" method="post" novalidate>
+            {{ form.hidden_tag() }}
+            {{ form.keyword() }}
+            {{ form.submit() }}
+        </form>
     </div>
-    <div>{{ msg }}</div>
     {% for t in threads %}
         <div class='thread'>
-            <h3>ID: {{ t[0] }} - Title: {{ t[5] }}</h3>
-            <h5>For {{ t[3] }}: {{ t[4] }}</h5>
+            <h2>ID: {{ t[0] }} - Title: {{ t[5] }}</h2>
+            <h4>For {{ t[3] }}: {{ t[4] }}</h4>
             <a href="{{ url_for('messages', id=t[0], target=t[3]) }}" class="active">more</a>
         </div>
     {% endfor %}
-    
+    <div class='msg1'>{{ msg }}</div>
 {% endblock %}

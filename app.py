@@ -4,12 +4,13 @@ from flask import Flask, render_template, request, url_for, redirect, session, f
 from wtforms import StringField, PasswordField, SubmitField, DateField, SelectField
 from flask_wtf import FlaskForm
 from wtforms.validators import DataRequired
-from forms import SignUpForm, EditForm, ThreadForm, ReplyForm, BlockForm
+from forms import SignUpForm, EditForm, ThreadForm, ReplyForm, BlockForm, SearchBar
 from utils import is_number
+
 app = Flask(__name__)
 app.secret_key = 'yoursecretkey'
 
-
+# Function for getting connection
 def get_db_connection():
     conn = psycopg2.connect(host='localhost',
                             database='postgres',
@@ -254,77 +255,87 @@ def postthread():
             
 @app.route('/threads/<source>', methods=['GET', 'POST'])
 def threads(source):
+    form=SearchBar()
     threads=[]
     msg=''
+    keyword='%%'
     #Fetch threads(not finished)
     if 'loggedin' in session:
         conn = get_db_connection()
         cur = conn.cursor()
+        if form.validate_on_submit():
+            keyword='%'+str(form.keyword.data)+'%'
         # All recieved threads
         if source=='all':
             # Personal threads
-            cur.execute("SELECT * FROM project_schema.threads where recipientid=%s and (target='friend' or target='neighbor');",(session['id'],))
+            cur.execute("SELECT * FROM project_schema.threads t where recipientid=%s and (target='friend' or target='neighbor') and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s));"
+                        ,(session['id'], keyword, keyword,))
             threads = cur.fetchall()
             # Block threads
             cur.execute(
-                "SELECT * FROM project_schema.threads t, project_schema.userblocks ub where t.recipientid=ub.blockid and userid=%s and target='block';"
-                ,(session['id'],)
+                "SELECT * FROM project_schema.threads t, project_schema.userblocks ub where t.recipientid=ub.blockid and userid=%s and target='block' and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s));"
+                ,(session['id'], keyword, keyword,)
             )
             bthreads = cur.fetchall()
             # Neighborhood threads
             cur.execute(
-                "SELECT * FROM project_schema.threads t, (select ub.userid, neighborhoodid from project_schema.userblocks ub, project_schema.blocks b where ub.blockid=b.blockid and ub.isjoined=true) un where t.recipientid=un.neighborhoodid and userid=%s and target='hood';"
-                ,(session['id'],)
+                "SELECT * FROM project_schema.threads t, (select ub.userid, neighborhoodid from project_schema.userblocks ub, project_schema.blocks b where ub.blockid=b.blockid and ub.isjoined=true) un where t.recipientid=un.neighborhoodid and userid=%s and target='hood' and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s));"
+                ,(session['id'], keyword, keyword,)
             )
             nthreads = cur.fetchall()
             threads=threads+bthreads+nthreads
         # All new recieved threads
         elif source=='new':
             lastlogintime = str(session['lastlogintime'])
-            msg='Threads with messages after '+ lastlogintime
             # Personal threads
             cur.execute(
-                "SELECT * FROM project_schema.threads t where t.recipientid=%s and (target='friend' or target='neighbor') and exists(select * from project_schema.messages m where m.threadid=t.threadid and m.timestamp>%s);"
-                ,(session['id'], lastlogintime,))
+                "SELECT * FROM project_schema.threads t where t.recipientid=%s and (target='friend' or target='neighbor') and exists(select * from project_schema.messages m where m.threadid=t.threadid and m.timestamp>%s) and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s));"
+                ,(session['id'], lastlogintime, keyword, keyword,))
             threads = cur.fetchall()
             # Block threads
             cur.execute(
-                'SELECT * FROM project_schema.threads t, project_schema.userblocks ub where t.recipientid=ub.blockid and userid=%s and target=%s and exists(select * from project_schema.messages m where m.threadid=t.threadid and m.timestamp>%s);'
-                ,(session['id'], 'block', lastlogintime,)
+                'SELECT * FROM project_schema.threads t, project_schema.userblocks ub where t.recipientid=ub.blockid and userid=%s and target=%s and exists(select * from project_schema.messages m where m.threadid=t.threadid and m.timestamp>%s) and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s));'
+                ,(session['id'], 'block', lastlogintime, keyword, keyword,)
             )
             bthreads = cur.fetchall()
             # Neighborhood threads
             cur.execute(
-                "SELECT * FROM project_schema.threads t, (select ub.userid, neighborhoodid from project_schema.userblocks ub, project_schema.blocks b where ub.blockid=b.blockid and ub.isjoined=true) un where t.recipientid=un.neighborhoodid and userid=%s and target='hood' and exists(select * from project_schema.messages m where m.threadid=t.threadid and m.timestamp>%s);"
-                ,(session['id'], lastlogintime,)
+                "SELECT * FROM project_schema.threads t, (select ub.userid, neighborhoodid from project_schema.userblocks ub, project_schema.blocks b where ub.blockid=b.blockid and ub.isjoined=true) un where t.recipientid=un.neighborhoodid and userid=%s and target='hood' and exists(select * from project_schema.messages m where m.threadid=t.threadid and m.timestamp>%s) and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s));"
+                ,(session['id'], lastlogintime, keyword, keyword,)
             )
             nthreads = cur.fetchall()
             threads=threads+bthreads+nthreads
+            msg=str(len(threads))+' threads with messages after '+ lastlogintime
+            
         # All threads that user has left messages in
         elif source=='my':
-            cur.execute('SELECT * FROM project_schema.threads t, project_schema.messages m where t.threadid = m.threadid and m.authorid=%s;',(session['id'],))
+            cur.execute('SELECT * FROM project_schema.threads t where exists(select * from project_schema.messages m where t.threadid = m.threadid and m.authorid=%s) and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s));'
+                        ,(session['id'], keyword, keyword,))
             threads = cur.fetchall()        
         elif source=='friend':
-            cur.execute("SELECT * FROM project_schema.threads where recipientid=%s and target=%s",(session['id'], source))
+            cur.execute("SELECT * FROM project_schema.threads t where recipientid=%s and target=%s and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s))"
+                        ,(session['id'], source, keyword, keyword,))
             threads = cur.fetchall()
         elif source=='neighbor':
-            cur.execute("SELECT * FROM project_schema.threads where recipientid=%s and target=%s",(session['id'], source))
+            cur.execute("SELECT * FROM project_schema.threads t where recipientid=%s and target=%s and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s))"
+                        ,(session['id'], source, keyword, keyword,))
             threads = cur.fetchall()
         elif source=='block':
             cur.execute(
-                "SELECT * FROM project_schema.threads t, project_schema.userblocks ub where t.recipientid=ub.blockid and userid=%s and target=%s;"
-                ,(session['id'], source)
+                "SELECT * FROM project_schema.threads t, project_schema.userblocks ub where t.recipientid=ub.blockid and userid=%s and target=%s and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s));"
+                ,(session['id'], source, keyword, keyword,)
             )
             threads = cur.fetchall()
         elif source=='hood':
             cur.execute(
-                "SELECT * FROM project_schema.threads t, (select ub.userid, neighborhoodid from project_schema.userblocks ub, project_schema.blocks b where ub.blockid=b.blockid and ub.isjoined=true) un where t.recipientid=un.neighborhoodid and userid=%s and target=%s;"
-                ,(session['id'], source)
+                "SELECT * FROM project_schema.threads t, (select ub.userid, neighborhoodid from project_schema.userblocks ub, project_schema.blocks b where ub.blockid=b.blockid and ub.isjoined=true) un where t.recipientid=un.neighborhoodid and userid=%s and target=%s and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s));"
+                ,(session['id'], source, keyword, keyword,)
             )
             threads = cur.fetchall()
+            
         cur.close()
         conn.close()
-        return render_template('threads.html', userid = session['id'], username=session['username'], msg=msg, threads=threads)
+        return render_template('threads.html', userid = session['id'], username=session['username'], msg=msg, threads=threads, form=form)
     return redirect(url_for('login'))
 
 @app.route('/messages/<id>/<target>', methods=['GET', 'POST'])
@@ -515,3 +526,7 @@ def approverequests(id):
     cur.close()
     conn.close()
     return redirect(url_for('viewrequests', msg=msg))
+
+@app.route('/about/')
+def about():
+    return render_template('about.html')

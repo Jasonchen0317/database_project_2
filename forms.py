@@ -28,7 +28,7 @@ class EditForm(FlaskForm):
 class ThreadForm(FlaskForm):
     title = StringField('Title', validators=[DataRequired()])
     target = SelectField('Target', choices=[('friend', 'Friend'), ('neighbor', 'Neighbor'), ('hood', 'Hood'), ('block', 'Block')])
-    rid=StringField('Recipient', validators=[DataRequired(), isinteger])
+    rid=StringField('Recipient ID', validators=[DataRequired(), isinteger])
     latitude = StringField('Latitude', validators=[])
     longitude = StringField('Longitude', validators=[])
     body=TextAreaField('Body', validators=[])
@@ -42,3 +42,7 @@ class BlockForm(FlaskForm):
     join = SelectField('Join or Follow', choices=[('true', 'Join'), ('false', 'Follow')], validators=[DataRequired()])
     blockid = SelectField('Block', choices=[], validators=[DataRequired()])
     submit = SubmitField('Send')
+    
+class SearchBar(FlaskForm):
+    keyword = StringField('Keyword', validators=[DataRequired()])
+    submit = SubmitField('Search')

@@ -10,9 +10,27 @@
             margin-left: 50px;
             text-decoration: none;
         }
+        .btnblue {
+            text-decoration: none;
+            padding: 0.5rem;
+            margin-left: 10px;
+            margin-bottom: 5px
+            border: 1px solid #333333;
+            background-color: #d5f0f2
+        }
+        .searchbar{
+            padding: 10px;
+            margin-left: 1px;
+            margin-top: 5px
+        }
+        .msg1 {
+            padding: 10px;
+            margin: 5px;
+        }  
         .msg {
             color: #ff1500;
         }
+        
         .block1 {
             padding: 20px;
             margin: 10px;
@@ -45,7 +63,7 @@
         <a href="{{ url_for('blocks') }}">Blocks</a>
         <a href="{{ url_for('threads', source='all') }}">Threads</a>
 		<a href="{{ url_for('logout') }}">Logout</a>
-        <a href="#">About</a>
+        <a href="{{ url_for('about') }}">About</a>
     </nav>
     <hr>
     <div class="content">
