@@ -212,7 +212,7 @@ def postthread():
             return redirect(url_for('index'))
         return render_template('post.html', form=form)
 
-            
+
 @app.route('/threads/', methods=['GET', 'POST'])
 def threads():
     if 'loggedin' in session:
@@ -262,13 +262,13 @@ def threads():
             nthreads = cur.fetchall()
             threads=threads+bthreads+nthreads
             msg=str(len(threads))+' threads with messages after '+ lastlogintime
-            
+
         # All threads that user has left messages in
         elif source=='my':
             cur.execute('SELECT * FROM project_schema.threads t where exists(select * from project_schema.messages m where t.threadid = m.threadid and m.authorid=%s) and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s));'
                         ,(session['id'], keyword, keyword,))
             threads = cur.fetchall() 
-        # Friend threads       
+        # Friend threads
         elif source=='friend':
             cur.execute("SELECT * FROM project_schema.threads t where recipientid=%s and target=%s and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s))"
                         ,(session['id'], source, keyword, keyword,))
@@ -292,7 +292,7 @@ def threads():
                 ,(session['id'], source, keyword, keyword,)
             )
             threads = cur.fetchall()
-            
+
         cur.close()
         conn.close()
         return render_template('threads.html', userid = session['id'], username=session['username'], msg=msg, threads=threads, form=form)
@@ -431,7 +431,7 @@ def joinblocks():
 @app.route('/viewrequests/', methods=['GET', 'POST'])
 def viewrequests():
     #view requests for user's joined block
-    msg=''
+    msg = ''
     conn = get_db_connection()
     cur = conn.cursor()
     #get the user's joined block
