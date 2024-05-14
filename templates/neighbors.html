@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block content %}
+    <h1>{% block title %} My Neighbors{% endblock %}</h1>
+    <div>
+        <a class="btnblue" href="{{ url_for('addneighbor') }}">Add neighbors</a>
+    </div>
+    {% for n in neighbors %}
+        <div class='neighbor'>
+            <h3>ID: {{ n[0] }} - Name: {{ n[1] }}</h3>
+            <a href="{{ url_for('viewprofile', id=n[0]) }}">View Profile</a>
+        </div>
+    {% endfor %}
+    <div class='msg1'>{{ msg }}</div>
+{% endblock %}

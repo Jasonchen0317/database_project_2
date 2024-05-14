@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+	<h1>{% block title %} {{profile[1]}}'s Profile{% endblock %}</h1>
+		<div class="block1">
+			<h3>User ID: {{ profile[0] }} </h3>
+			<h3>User Name: {{ profile[1] }} </h3>
+			<h3>Profile: {{ profile[6] }}</h3>
+			<h3>Last Login Time: {{ logintime[1] }}</h3>
+		</div>
+		
+{% endblock %}

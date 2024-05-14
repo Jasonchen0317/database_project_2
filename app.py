@@ -4,21 +4,21 @@ from flask import Flask, render_template, request, url_for, redirect, session, f
 from wtforms import StringField, PasswordField, SubmitField, DateField, SelectField
 from flask_wtf import FlaskForm
 from wtforms.validators import DataRequired
-from forms import SignUpForm, EditForm, ThreadForm, ReplyForm, BlockForm, SearchBar
+from forms import SignUpForm, EditForm, ThreadForm, ReplyForm, BlockForm, SearchBar, FriendRequestForm
 from utils import is_number
 
 app = Flask(__name__)
 app.secret_key = 'yoursecretkey'
 
-# Function for getting connection
+# Get connection from database
 def get_db_connection():
     conn = psycopg2.connect(host='localhost',
                             database='postgres',
                             user='postgres',
-                            password='Hujiahong137')
+                            password='jason123')
     return conn
 
-
+# Login
 @app.route('/', methods=('GET', 'POST'))
 def login():
     msg = ''
@@ -51,11 +51,26 @@ def login():
                 'select lastaccesstimestamp from project_schema.useractivity where userid=%s;', 
                 (session['id'],)
             )
-            session['lastlogintime']=cur.fetchone()[0]
+            lastlogintime = cur.fetchone()
+            
+            # If it is user's first time login, log the current time and use it as last login time
+            if not lastlogintime:
+                cur.execute(
+                    'insert into project_schema.useractivity(userid, lastaccesstimestamp) values(%s, CURRENT_TIMESTAMP);', 
+                    (session['id'],)
+                )
+                conn.commit()
+                cur.execute(
+                    'select lastaccesstimestamp from project_schema.useractivity where userid=%s;', 
+                    (session['id'],)
+                )
+                lastlogintime = cur.fetchone()
+            # Else: fetch last login time and update 
+            session['lastlogintime']=lastlogintime[0]
             # Update login time
             cur.execute(
-                'insert into project_schema.useractivity(userid, lastaccesstimestamp) values (%s, CURRENT_TIMESTAMP) on conflict(userid) do update set lastaccesstimestamp=CURRENT_TIMESTAMP;', \
-                    (session['id'],)
+                'insert into project_schema.useractivity(userid, lastaccesstimestamp) values(%s, CURRENT_TIMESTAMP) on conflict(userid) do update set lastaccesstimestamp=CURRENT_TIMESTAMP;', 
+                (session['id'],)
             )
             conn.commit()
             cur.close()
@@ -68,12 +83,13 @@ def login():
     # Show the login form with message (if any)
     return render_template('login.html', msg=msg)
 
+# Register a new account
 @app.route('/register/', methods=['GET', 'POST'])
 def register():
     # Output message if something goes wrong...
     msg = ''
     form = SignUpForm()
-    #Submit form
+    #Submit register form
     if form.validate_on_submit():
         username = form.username.data
         password = form.password.data
@@ -92,21 +108,26 @@ def register():
                 msg = 'Account already exists!'
             else:
                 # Account doesn't exist, and the form data is valid, so insert the new account into the accounts table
-                cur.execute("INSERT INTO project_schema.users(userid, username, password, address, latitude, longitude, profile) VALUES (COALESCE((SELECT max(userid) + 1 FROM project_schema.users), 1), %s, %s, %s, %s, %s, %s);", \
-                            (username, password, address, latitude, longitude, profile,))
+                cur.execute(
+                    'INSERT INTO project_schema.users(userid, username, password, address, latitude, longitude, profile) VALUES ((select max(userid)+1 from project_schema.users), %s, %s, %s, %s, %s, %s);',
+                    (username, password, address, latitude, longitude, profile,)
+                )
                 conn.commit()
                 cur.close()
                 conn.close()
                 msg = 'You have successfully registered!'
                 return redirect(url_for('login'))
+        else:
+            msg = 'Invalid Input!'
     elif request.method == 'POST':
         # Form is empty... (no POST data)
-        msg = 'Please fill out the form!'
-
+        msg = 'Please fill out the form!'   
+        
     # Show registration form with message (if any)
     
     return render_template('register.html', msg=msg, form=form)
 
+# Logout
 @app.route('/logout/')
 def logout():
     # Remove session data, this will log the user out
@@ -116,12 +137,14 @@ def logout():
    # Redirect to login page
    return redirect(url_for('login'))
 
+# Home Page
 @app.route('/index/')
 def index():
     if 'loggedin' in session:
         return render_template('index.html', userid = session['id'], username=session['username'])
     return redirect(url_for('login'))
 
+# My Profile
 @app.route('/profile/')
 def profile():
     #Fetch user profile if logged in
@@ -133,6 +156,7 @@ def profile():
             (session['id'],)
         )
         profile = cur.fetchone()
+        # Fetch login time
         cur.execute(
             'SELECT * FROM project_schema.useractivity where userid=%s;',
             (session['id'],)
@@ -143,6 +167,7 @@ def profile():
         return render_template('profile.html', profile=profile, logintime=logintime)
     return redirect(url_for('login'))
 
+# Editing profile
 @app.route('/editprofile/', methods=['GET', 'POST'])
 def editprofile():
     msg=''
@@ -167,20 +192,28 @@ def editprofile():
             conn.close()
             return render_template('editprofile.html', form=form)
         if form.validate_on_submit():
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute(
-                'update project_schema.users set address=%s, latitude=%s, longitude=%s, profile=%s where userid=%s',
-                (form.address.data, form.latitude.data, form.longitude.data, form.profile.data, session['id'],)
-            )
-            conn.commit()
-            cur.close()
-            conn.close()
-            flash('Update Successfully!')
-            return redirect(url_for('profile'))
-        return render_template('editprofile.html', title='Edit Account', form=form)
-    
+            #update profile if input is valid
+            lat=form.latitude.data
+            long=form.longitude.data
+            if is_number(lat) and is_number(long):
+                conn = get_db_connection()
+                cur = conn.cursor()
+                cur.execute(
+                    'update project_schema.users set address=%s, latitude=%s, longitude=%s, profile=%s where userid=%s',
+                    (form.address.data, form.latitude.data, form.longitude.data, form.profile.data, session['id'],)
+                )
+                conn.commit()
+                cur.close()
+                conn.close()
+                flash('Update Successfully!')
+                return redirect(url_for('profile'))
+            else:
+                msg = 'Invalid Input!'
+        elif request.method == 'POST':
+            msg='Invalid Input!'
+        return render_template('editprofile.html', title='Edit Account', form=form, msg=msg)
 
+# Posting threads
 @app.route('/postthread/', methods=['GET', 'POST'])
 def postthread():
     #Insert into both thread and message table
@@ -196,25 +229,65 @@ def postthread():
             body = form.body.data
             conn = get_db_connection()
             cur = conn.cursor()
+            #Check if recipient is valid
             cur.execute(
-                'insert into project_schema.threads(title, locationlatitude, locationlongitude, recipientid, target) values(%s, %s, %s, %s, %s)', 
-                (title, lat, long, rid, target)
-            )
-            conn.commit()
+                    "SELECT * FROM project_schema.userblocks where blockid=%s and userid=%s and isjoined=true;",
+                    (rid, session['id'],))
+            joinedblock = cur.fetchone()
             cur.execute(
-                'insert into project_schema.messages(threadid, authorid, timestamp, body) values((select max(threadid) from project_schema.threads), %s, CURRENT_TIMESTAMP, %s)',
-                (session['id'], body)
-            )
-            conn.commit()
-            cur.close()
-            conn.close()
-            flash('Post Successfully!')
-            return redirect(url_for('index'))
-        return render_template('post.html', form=form)
+                    "SELECT * FROM (select * from project_schema.userblocks where isjoined=true) ub, project_schema.blocks b where b.blockid=ub.blockid and neighborhoodid = %s and userid=%s;",
+                    (rid, session['id'],))
+            joinedhood = cur.fetchone()
+            cur.execute(
+                    "SELECT * FROM project_schema.userfriends where userid1 = %s and userid2=%s;",
+                    (rid, session['id'],))
+            isfriend = cur.fetchone()
+            cur.execute(
+                    "SELECT * FROM project_schema.userneighbors where userid1 = %s and userid2=%s;",
+                    (rid, session['id'],))
+            isneighbor = cur.fetchone()
 
+            if target=='block' and not joinedblock:
+                msg="You're not joined in this block!"
+            elif target=='hood' and not joinedhood:
+                msg="You're not joined in this hood!"
+            elif target=='friend' and not isfriend:
+                msg="You're not friend with this user!"
+            elif target=='neighbor' and not isneighbor:
+                msg="You're not neighbor with this user!"
+            elif not is_number(lat) or not is_number(long):
+                msg='Invalid location'
+            
+            else:
+                # The recipient is valid, insert thread and the initial message
+                cur.execute(
+                    'insert into project_schema.threads(title, locationlatitude, locationlongitude, recipientid, target) values(%s, %s, %s, %s, %s)', 
+                    (title, lat, long, rid, target)
+                )
+                conn.commit()
+                cur.execute(
+                    'insert into project_schema.messages(threadid, authorid, timestamp, body) values((select max(threadid) from project_schema.threads), %s, CURRENT_TIMESTAMP, %s)',
+                    (session['id'], body)
+                )
+                conn.commit()
+                cur.close()
+                conn.close()
+                flash('Post Successfully!')
+                return redirect(url_for('threads', source='my'))
+        elif request.method == 'POST':
+            msg='invalid post'    
+        return render_template('post.html', form=form, msg=msg, username=session['username'])
 
-@app.route('/threads/', methods=['GET', 'POST'])
-def threads():
+# Threads
+@app.route('/threads/<source>', methods=['GET', 'POST'])
+def threads(source):
+    # Search bar
+    form=SearchBar()
+    threads=[]
+    msg=''
+    # blank keyword
+    keyword='%%'
+    # Fetch threads
     if 'loggedin' in session:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -262,13 +335,13 @@ def threads():
             nthreads = cur.fetchall()
             threads=threads+bthreads+nthreads
             msg=str(len(threads))+' threads with messages after '+ lastlogintime
-
+            
         # All threads that user has left messages in
         elif source=='my':
             cur.execute('SELECT * FROM project_schema.threads t where exists(select * from project_schema.messages m where t.threadid = m.threadid and m.authorid=%s) and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s));'
                         ,(session['id'], keyword, keyword,))
             threads = cur.fetchall() 
-        # Friend threads
+        # Friend threads       
         elif source=='friend':
             cur.execute("SELECT * FROM project_schema.threads t where recipientid=%s and target=%s and (title ILIKE %s or exists(select * from project_schema.messages m where t.threadid = m.threadid and m.body ILIKE %s))"
                         ,(session['id'], source, keyword, keyword,))
@@ -292,7 +365,7 @@ def threads():
                 ,(session['id'], source, keyword, keyword,)
             )
             threads = cur.fetchall()
-
+            
         cur.close()
         conn.close()
         return render_template('threads.html', userid = session['id'], username=session['username'], msg=msg, threads=threads, form=form)
@@ -309,7 +382,7 @@ def messages(id, target):
         # Fetch all messages from thread with id
         cur.execute('SELECT * FROM project_schema.messages m, project_schema.users u where m.authorid = u.userid and threadid=%s order by timestamp asc;',(id,))
         m = cur.fetchall()
-        
+        # Reply
         if form.validate_on_submit():
             cur.execute(
                 'insert into project_schema.messages(threadid, authorid, timestamp, body) values(%s, %s, CURRENT_TIMESTAMP, %s)',
@@ -319,7 +392,7 @@ def messages(id, target):
             cur.close()
             conn.close()
             return redirect(url_for('messages', id=id, target=target))
-        # Check if user is joined or follow to a block (can/cannot reply)
+        # Check if thread's target is block (can/cannot reply)
         if target=='block':
             cur.execute(
                 'SELECT * FROM project_schema.userblocks where blockid = (select recipientid from project_schema.threads where threadid=%s) and userid=%s and isjoined=true;',
@@ -329,6 +402,7 @@ def messages(id, target):
                 # Render template with reply form
                 return render_template('messages.html', messages=m, form=form, msg=msg, username=session['username'])
             else:
+                # Render template without reply form
                 msg='Only joined member can reply to this thread.'
                 return render_template('messagesnoreply.html', messages=m, msg=msg)
         # User can reply to any other messages
@@ -336,6 +410,7 @@ def messages(id, target):
             return render_template('messages.html', messages=m, form=form, msg=msg, username=session['username'])
     return redirect(url_for('login'))
 
+# Show user's joined and followed block
 @app.route('/blocks/', methods=['GET', 'POST'])
 def blocks():
     if 'loggedin' in session:
@@ -370,6 +445,7 @@ def blocks():
         return render_template('blocks.html', joinedblock=jb, followedblock=fb,hood=hood, requests=requests)
     return redirect(url_for('login'))
 
+# Send a join block request or follow a block
 @app.route('/joinblocks/', methods=['GET', 'POST'])
 def joinblocks():
     msg = ''
@@ -426,12 +502,15 @@ def joinblocks():
             cur.close()
             conn.close()
             return redirect(url_for('blocks'))
+    elif request.method == 'POST':
+            msg='Invalid request!'
     return render_template('joinblocks.html', msg=msg, form=form)
 
+# View the requests for joining user's joined block
 @app.route('/viewrequests/', methods=['GET', 'POST'])
 def viewrequests():
     #view requests for user's joined block
-    msg = ''
+    msg=''
     conn = get_db_connection()
     cur = conn.cursor()
     #get the user's joined block
@@ -450,6 +529,7 @@ def viewrequests():
     conn.close()
     return render_template('viewrequests.html', msg=msg, requests=requests)
 
+# Approve a request
 @app.route('/approverequests/<id>')
 def approverequests(id):
     msg=''
@@ -487,6 +567,175 @@ def approverequests(id):
     cur.close()
     conn.close()
     return redirect(url_for('viewrequests', msg=msg))
+
+# Show user's friends
+@app.route('/friends/', methods=['GET', 'POST'])
+def friends():
+    if 'loggedin' in session:
+        msg=''
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT u.userid, username FROM project_schema.userfriends uf, project_schema.users u where uf.userid2=u.userid and userid1=%s;"
+            ,(session['id'],)
+        )
+        friends=cur.fetchall()
+        cur.close()
+        conn.close()
+        return render_template('friends.html', friends=friends, msg=msg)
+    return redirect(url_for('login'))
+
+# Send a friend requests
+@app.route('/sendfriendrequest/', methods=['GET', 'POST'])
+def sendfriendrequest():
+    msg=''
+    form=FriendRequestForm()
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    # Fetch users that are not friend
+    cur.execute("SELECT userid, username FROM project_schema.users u where not exists(select * from project_schema.friendrequests f where ((u.userid=f.receiverid and senderid=%s) or (u.userid=f.senderid and receiverid=%s)) and f.requeststatus!='rejected') and not exists(select * from project_schema.userfriends uf where u.userid=userid1 and userid2=%s) and u.userid!=%s ORDER BY u.userid;"
+                ,(session['id'], session['id'], session['id'], session['id'], ))
+    notfriend=cur.fetchall()
+    # Fetch user's previous requests
+    cur.execute("SELECT receiverid, requeststatus from project_schema.friendrequests where senderid=%s"
+                ,(session['id'],))
+    myrequests=cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    # Get user id and name for form
+    users=[(b[0], str(b[0])+' '+b[1]) for b in notfriend]
+    form.users.choices=users
+    
+    #Insert into friend request if valid
+    if form.validate_on_submit():
+        userid = form.users.data
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("INSERT INTO project_schema.friendrequests(senderid, receiverid, requeststatus) VALUES (%s, %s, 'pending')", (session['id'],userid,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return redirect(url_for('sendfriendrequest'))
+    elif request.method == 'POST':
+            msg='Invalid request'
+    return render_template('sendfriendrequest.html', form=form, myrequests=myrequests, msg=msg)
+
+# View received friend requests
+@app.route('/viewfriendrequest/', methods=['GET', 'POST'])
+def viewfriendrequest():
+    msg=''
+    conn = get_db_connection()
+    cur = conn.cursor()
+    # View only pending requests
+    cur.execute("select f.requestid, u.userid, username from project_schema.users u, project_schema.friendrequests f where u.userid=f.senderid and f.receiverid=%s and f.requeststatus='pending';"
+                ,(session['id'],))
+    friendrequests=cur.fetchall()
+    msg="You have "+str(len(friendrequests))+" friend request(s)"
+    cur.close()
+    conn.close()
+    
+    return render_template('viewfriendrequest.html', requests=friendrequests, msg=msg)
+
+# Respond to a friend request
+@app.route('/respond/<id>/<respond>/', methods=['GET', 'POST'])
+def respond(id, respond):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    # Accept
+    if respond=='accept':
+        cur.execute(
+            'INSERT INTO project_schema.userfriends(userid1, userid2) VALUES ((select senderid from project_schema.friendrequests where requestid=%s), (select receiverid from project_schema.friendrequests where requestid=%s));',
+            (id, id,)
+        )
+        conn.commit()
+        cur.execute(
+            'INSERT INTO project_schema.userfriends(userid1, userid2) VALUES ((select receiverid from project_schema.friendrequests where requestid=%s), (select senderid from project_schema.friendrequests where requestid=%s));',
+            (id, id,)
+        )
+        conn.commit()
+        cur.execute(
+            "update project_schema.friendrequests set requeststatus='accepted' where requestid=%s",
+            (id,)
+        )
+        conn.commit()
+    # Reject
+    else:
+        cur.execute(
+            "update project_schema.friendrequests set requeststatus='rejected' where requestid=%s",
+            (id, session['id'],)
+        )
+        conn.commit()
+        
+    cur.close()
+    conn.close()
+    return redirect(url_for('viewfriendrequest'))
+
+# View user's neighbors
+@app.route('/neighbors/', methods=['GET', 'POST'])
+def neighbors():
+    if 'loggedin' in session:
+        msg=''
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT u.userid, username FROM project_schema.userneighbors un, project_schema.users u where un.userid2=u.userid and userid1=%s;"
+            ,(session['id'],)
+        )
+        neighbors=cur.fetchall()
+        cur.close()
+        conn.close()
+        return render_template('neighbors.html', neighbors=neighbors, msg=msg)
+    return redirect(url_for('login'))
+
+# Adding a user(block member) as neighbor 
+@app.route('/addneighbor/', methods=['GET', 'POST'])
+def addneighbor():
+    msg=''
+    form=FriendRequestForm()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT u.userid, u.username, blockid FROM project_schema.users u, project_schema.userblocks ub where u.userid=ub.userid and ub.isjoined=true and not exists(select * from project_schema.userneighbors un where u.userid=userid1 and userid2=%s) and (ub.blockid=(select blockid from project_schema.userblocks where userid=%s and isjoined=true)) and u.userid!=%s ORDER BY u.userid;"
+                ,(session['id'], session['id'], session['id'],))
+    notneighbor=cur.fetchall()
+    users=[(b[0], str(b[0])+' '+b[1]) for b in notneighbor]
+    form.users.choices=users
+    if form.validate_on_submit():
+        userid = form.users.data
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("INSERT INTO project_schema.userneighbors(userid1, userid2) VALUES (%s, %s)", (session['id'],userid,))
+        conn.commit()
+        cur.execute("INSERT INTO project_schema.userneighbors(userid1, userid2) VALUES (%s, %s)", (userid, session['id'],))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return redirect(url_for('neighbors'))
+    elif request.method == 'POST':
+            msg='invalid post'
+    return render_template('addneighbor.html', form=form, msg=msg)
+    
+# View other user's profile
+@app.route('/viewprofile/<id>', methods=['GET'])
+def viewprofile(id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+            'SELECT * FROM project_schema.users where userid=%s;',
+            (id,)
+    )
+    # Profile
+    profile = cur.fetchone()
+    cur.execute(
+            'SELECT * FROM project_schema.useractivity where userid=%s;',
+            (id,)
+    )
+    # Login
+    logintime = cur.fetchone()
+    cur.close()
+    conn.close()
+    return render_template('viewprofile.html', profile=profile, logintime=logintime)
 
 @app.route('/about/')
 def about():

@@ -30,7 +30,16 @@
         .msg {
             color: #ff1500;
         }
-        
+        .friend {
+            padding: 10px;
+            margin: 10px;
+            background-color: #d5f0f2;
+        }
+        .neighbor {
+            padding: 10px;
+            margin: 10px;
+            background-color: #CDFFFF;
+        }
         .block1 {
             padding: 20px;
             margin: 10px;
@@ -42,7 +51,7 @@
             background-color: #f3f3f3
         }
         .thread {
-            padding: 20px;
+            padding: 15px;
             margin: 10px;
             background-color: #fff0e3;
         }
@@ -58,8 +67,8 @@
     <nav>
         <a href="{{ url_for('index') }}">FlaskApp</a>
         <a href="{{ url_for('profile') }}">Profile</a>
-        <a href="#">Friends</a>
-        <a href="#">Neighbors</a>
+        <a href="{{ url_for('friends') }}">Friends</a>
+        <a href="{{ url_for('neighbors') }}">Neighbors</a>
         <a href="{{ url_for('blocks') }}">Blocks</a>
         <a href="{{ url_for('threads', source='all') }}">Threads</a>
 		<a href="{{ url_for('logout') }}">Logout</a>
