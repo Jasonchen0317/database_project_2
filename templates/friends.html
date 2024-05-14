@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block content %}
+    <h1>{% block title %} My Friends{% endblock %}</h1>
+    <div>
+        <a class="btnblue" href="{{ url_for('viewfriendrequest') }}" class="active">Friend Requests</a>
+        <a class="btnblue" href="{{ url_for('sendfriendrequest') }}">Send Requests</a>
+    </div>
+    {% for f in friends %}
+        <div class='friend'>
+            <h3>ID: {{ f[0] }} - Name: {{ f[1] }}</h3>
+        </div>
+    {% endfor %}
+    <div class='msg1'>{{ msg }}</div>
+{% endblock %}

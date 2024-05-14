@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block content %}
+    <h1>{% block title %}Add New Neighbors{% endblock %}</h1>
+	<form action="" method="post">
+		{{ form.hidden_tag() }}
+		<p>
+			{{ form.users.label }}<br>
+			{{ form.users() }}
+		</p>
+		
+		<p>{{ form.submit() }}</p>
+	</form>
+	<div class="msg">{{ msg }}</div>
+{% endblock %}

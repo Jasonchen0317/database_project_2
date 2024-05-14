@@ -20,8 +20,8 @@
     </div>
     {% for t in threads %}
         <div class='thread'>
-            <h2>ID: {{ t[0] }} - Title: {{ t[5] }}</h2>
-            <h4>For {{ t[3] }}: {{ t[4] }}</h4>
+            <h2>{{ t[5] }}</h2>
+            <h4 style="color: #3B3B3B">For {{ t[3] }}: {{ t[4] }}</h4>
             <a href="{{ url_for('messages', id=t[0], target=t[3]) }}" class="active">more</a>
         </div>
     {% endfor %}

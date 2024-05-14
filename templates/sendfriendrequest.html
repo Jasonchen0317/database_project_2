@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+    <h1>{% block title %}Send Friend Requests{% endblock %}</h1>
+	<form action="" method="post">
+		{{ form.hidden_tag() }}
+		<p>
+			{{ form.users.label }}<br>
+			{{ form.users() }}
+		</p>
+		
+		<p>{{ form.submit() }}</p>
+	</form>
+	<h2>Previous Requests</h2>
+	{% for m in myrequests %}
+        <div class="message">
+            <h4>Receiver ID: {{ m[0] }} Request Status: {{ m[1] }}</h4>
+        </div>
+    {% endfor %}
+	<div class="msg">{{ msg }}</div>
+{% endblock %}

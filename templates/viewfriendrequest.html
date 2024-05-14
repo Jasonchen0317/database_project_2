@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block content %}
+	<h1>{% block title %} Friend Requests {% endblock %}</h1>
+    {% for r in requests %}
+        <div class="message">
+            <h3>Request ID: {{ r[0] }} Requested User: {{ r[2] }}</h3>
+			<a href="{{ url_for('respond', id=r[0], respond='accept') }}" class="active">Accept</a>
+            <a href="{{ url_for('respond', id=r[0], respond='reject') }}">Reject</a>
+        </div>
+    {% endfor %}
+    <div class="msg">{{ msg }}</div>
+{% endblock %}

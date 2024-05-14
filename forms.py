@@ -46,3 +46,7 @@ class BlockForm(FlaskForm):
 class SearchBar(FlaskForm):
     keyword = StringField('Keyword', validators=[DataRequired()])
     submit = SubmitField('Search')
+    
+class FriendRequestForm(FlaskForm):
+    users = SelectField('Users', choices=[], validators=[DataRequired()])
+    submit = SubmitField('Send')

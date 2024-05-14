@@ -4,7 +4,7 @@ from flask import Flask, render_template, request, url_for, redirect, session, f
 from wtforms import StringField, PasswordField, SubmitField, DateField, SelectField
 from flask_wtf import FlaskForm
 from wtforms.validators import DataRequired
-from forms import SignUpForm, EditForm, ThreadForm, ReplyForm, BlockForm, SearchBar
+from forms import SignUpForm, EditForm, ThreadForm, ReplyForm, BlockForm, SearchBar, FriendRequestForm
 from utils import is_number
 
 app = Flask(__name__)
@@ -533,6 +533,134 @@ def approverequests(id):
     conn.close()
     return redirect(url_for('viewrequests', msg=msg))
 
+@app.route('/friends/', methods=['GET', 'POST'])
+def friends():
+    if 'loggedin' in session:
+        msg=''
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT u.userid, username FROM project_schema.userfriends uf, project_schema.users u where uf.userid2=u.userid and userid1=%s;"
+            ,(session['id'],)
+        )
+        friends=cur.fetchall()
+        cur.close()
+        conn.close()
+        return render_template('friends.html', friends=friends, msg=msg)
+    return redirect(url_for('login'))
+
+@app.route('/sendfriendrequest/', methods=['GET', 'POST'])
+def sendfriendrequest():
+    msg=''
+    form=FriendRequestForm()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT userid, username FROM project_schema.users u where not exists(select * from project_schema.friendrequests f where ((u.userid=f.receiverid and senderid=%s) or (u.userid=f.senderid and receiverid=%s)) and f.requeststatus!='rejected') and not exists(select * from project_schema.userfriends uf where u.userid=userid1 and userid2=%s) and u.userid!=%s ORDER BY u.userid;"
+                ,(session['id'], session['id'], session['id'], session['id'], ))
+    notfriend=cur.fetchall()
+    cur.execute("SELECT receiverid, requeststatus from project_schema.friendrequests where senderid=%s"
+                ,(session['id'],))
+    myrequests=cur.fetchall()
+    cur.close()
+    conn.close()
+    #Get block name and id
+    users=[(b[0], str(b[0])+' '+b[1]) for b in notfriend]
+    form.users.choices=users
+    if form.validate_on_submit():
+        userid = form.users.data
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("INSERT INTO project_schema.friendrequests(senderid, receiverid, requeststatus) VALUES (%s, %s, 'pending')", (session['id'],userid,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return redirect(url_for('sendfriendrequest'))
+    return render_template('sendfriendrequest.html', form=form, myrequests=myrequests)
+
+@app.route('/viewfriendrequest/', methods=['GET', 'POST'])
+def viewfriendrequest():
+    msg=''
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("select f.requestid, u.userid, username from project_schema.users u, project_schema.friendrequests f where u.userid=f.senderid and f.receiverid=%s and f.requeststatus='pending';"
+                ,(session['id'],))
+    friendrequests=cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return render_template('viewfriendrequest.html', requests=friendrequests)
+
+@app.route('/respond/<id>/<respond>/', methods=['GET', 'POST'])
+def respond(id, respond):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    if respond=='accept':
+        cur.execute(
+            'INSERT INTO project_schema.userfriends(userid1, userid2) VALUES ((select senderid from project_schema.friendrequests where requestid=%s), (select receiverid from project_schema.friendrequests where requestid=%s));',
+            (id, id,)
+        )
+        conn.commit()
+        cur.execute(
+            'INSERT INTO project_schema.userfriends(userid1, userid2) VALUES ((select receiverid from project_schema.friendrequests where requestid=%s), (select senderid from project_schema.friendrequests where requestid=%s));',
+            (id, id,)
+        )
+        conn.commit()
+        cur.execute(
+            "update project_schema.friendrequests set requeststatus='accepted' where requestid=%s",
+            (id,)
+        )
+        conn.commit()
+    else:
+        cur.execute(
+            "update project_schema.friendrequests set requeststatus='rejected' where requestid=%s",
+            (id, session['id'],)
+        )
+        conn.commit()
+        
+    cur.close()
+    conn.close()
+    return redirect(url_for('viewfriendrequest'))
+
+
+@app.route('/neighbors/', methods=['GET', 'POST'])
+def neighbors():
+    if 'loggedin' in session:
+        msg=''
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT u.userid, username FROM project_schema.userneighbors un, project_schema.users u where un.userid2=u.userid and userid1=%s;"
+            ,(session['id'],)
+        )
+        neighbors=cur.fetchall()
+        cur.close()
+        conn.close()
+        return render_template('neighbors.html', neighbors=neighbors, msg=msg)
+    return redirect(url_for('login'))
+
+@app.route('/addneighbor/', methods=['GET', 'POST'])
+def addneighbor():
+    form=FriendRequestForm()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT u.userid, u.username, blockid FROM project_schema.users u, project_schema.userblocks ub where u.userid=ub.userid and ub.isjoined=true and not exists(select * from project_schema.userneighbors un where u.userid=userid1 and userid2=%s) and (ub.blockid=(select blockid from project_schema.userblocks where userid=%s and isjoined=true)) and u.userid!=%s ORDER BY u.userid;"
+                ,(session['id'], session['id'], session['id'],))
+    notneighbor=cur.fetchall()
+    users=[(b[0], str(b[0])+' '+b[1]+' '+str(b[2])) for b in notneighbor]
+    form.users.choices=users
+    if form.validate_on_submit():
+        userid = form.users.data
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("INSERT INTO project_schema.userneighbors(userid1, userid2) VALUES (%s, %s)", (session['id'],userid,))
+        conn.commit()
+        cur.execute("INSERT INTO project_schema.userneighbors(userid1, userid2) VALUES (%s, %s)", (userid, session['id'],))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return redirect(url_for('neighbors'))
+    return render_template('addneighbor.html', form=form)
+        
 @app.route('/about/')
 def about():
     return render_template('about.html')
