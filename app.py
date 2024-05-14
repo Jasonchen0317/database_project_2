@@ -15,7 +15,7 @@ def get_db_connection():
     conn = psycopg2.connect(host='localhost',
                             database='postgres',
                             user='postgres',
-                            password='jason123')
+                            password='Hujiahong137')
     return conn
 
 # Login
@@ -466,10 +466,10 @@ def joinblocks():
         cur = conn.cursor()
         cur.execute('SELECT * FROM project_schema.userblocks where userid=%s and isjoined=true;', (session['id'],))
         joined=cur.fetchone()
-        cur.execute('SELECT * FROM project_schema.userblocks where userid=%s and blockid=%s;', (session['id'], blockid))
+        cur.execute('SELECT * FROM project_schema.userblocks where userid=%s and blockid=%s;', (session['id'], blockid,))
         followedorjoined=cur.fetchone()
-        cur.execute('SELECT * FROM project_schema.blockrequests where senderid=%s and blockid=%s;', (session['id'], blockid))
-        request=cur.fetchone()
+        cur.execute('SELECT * FROM project_schema.blockrequests where senderid=%s and blockid=%s;', (session['id'], blockid,))
+        block_request=cur.fetchone()
         cur.close()
         conn.close()
         #Check if user has joined a block
@@ -479,7 +479,7 @@ def joinblocks():
         elif followedorjoined:
             msg='Block already followed or joined!'
         #Check if request is sent
-        elif request and join=='true':
+        elif block_request and join=='true':
             msg='Already sent a request!'
         
         #Insert to blockrequests for join/ Insert to userblocks for follow
@@ -487,11 +487,22 @@ def joinblocks():
             conn = get_db_connection()
             cur = conn.cursor()
             if join=='true':
+                # cur.execute(
+                #     'INSERT INTO project_schema.blockrequests(requestid, senderid, blockid, approvedcount) VALUES ((select max(requestid)+1 from project_schema.blockrequests), %s, %s, 0)',
+                #     (session['id'], blockid)
+                # )
+
                 #Insert into blockrequests if join block
-                cur.execute(
-                    'INSERT INTO project_schema.blockrequests(requestid, senderid, blockid, approvedcount) VALUES ((select max(requestid)+1 from project_schema.blockrequests), %s, %s, 0)',
-                    (session['id'], blockid)
-                )
+                # to catch the case where the user doesn't live in the block that he/she is requesting to join
+                try:
+                    cur.execute(
+                        'INSERT INTO project_schema.blockrequests(requestid, senderid, blockid, approvedcount) VALUES ((select max(requestid)+1 from project_schema.blockrequests), %s, %s, 0)',
+                        (session['id'], blockid)
+                    )
+                except psycopg2.Error as e:
+                    msg='User does not live in the requested block!'
+                finally:
+                    return render_template('joinblocks.html', msg=msg, form=form)
             else:
                 #Insert into userblocks if follow block(no need to wait for approve)
                 cur.execute(
@@ -502,8 +513,10 @@ def joinblocks():
             cur.close()
             conn.close()
             return redirect(url_for('blocks'))
+    # commented out because it would generate an error:
+    # UnboundLocalError: cannot access local variable 'request' where it is not associated with a value
     elif request.method == 'POST':
-            msg='Invalid request!'
+        msg='Invalid request!'
     return render_template('joinblocks.html', msg=msg, form=form)
 
 # View the requests for joining user's joined block
@@ -594,8 +607,8 @@ def sendfriendrequest():
     conn = get_db_connection()
     cur = conn.cursor()
     # Fetch users that are not friend
-    cur.execute("SELECT userid, username FROM project_schema.users u where not exists(select * from project_schema.friendrequests f where ((u.userid=f.receiverid and senderid=%s) or (u.userid=f.senderid and receiverid=%s)) and f.requeststatus!='rejected') and not exists(select * from project_schema.userfriends uf where u.userid=userid1 and userid2=%s) and u.userid!=%s ORDER BY u.userid;"
-                ,(session['id'], session['id'], session['id'], session['id'], ))
+    cur.execute("SELECT userid, username FROM project_schema.users u where not exists(select * from project_schema.friendrequests f where ((u.userid=f.receiverid and f.senderid=%s) or (u.userid=f.senderid and f.receiverid=%s)) and f.requeststatus!='REJECTED') and not exists(select * from project_schema.userfriends uf where (uf.userid1=u.userid and uf.userid2=%s) or (uf.userid1=%s and uf.userid2=u.userid)) and u.userid!=%s ORDER BY u.userid;"
+                ,(session['id'], session['id'], session['id'], session['id'], session['id'],))
     notfriend=cur.fetchall()
     # Fetch user's previous requests
     cur.execute("SELECT receiverid, requeststatus from project_schema.friendrequests where senderid=%s"
@@ -613,13 +626,13 @@ def sendfriendrequest():
         userid = form.users.data
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("INSERT INTO project_schema.friendrequests(senderid, receiverid, requeststatus) VALUES (%s, %s, 'pending')", (session['id'],userid,))
+        cur.execute("INSERT INTO project_schema.friendrequests(senderid, receiverid, requeststatus) VALUES (%s, %s, 'PENDING')", (session['id'],userid,))
         conn.commit()
         cur.close()
         conn.close()
         return redirect(url_for('sendfriendrequest'))
     elif request.method == 'POST':
-            msg='Invalid request'
+        msg='Invalid request'
     return render_template('sendfriendrequest.html', form=form, myrequests=myrequests, msg=msg)
 
 # View received friend requests
@@ -629,13 +642,13 @@ def viewfriendrequest():
     conn = get_db_connection()
     cur = conn.cursor()
     # View only pending requests
-    cur.execute("select f.requestid, u.userid, username from project_schema.users u, project_schema.friendrequests f where u.userid=f.senderid and f.receiverid=%s and f.requeststatus='pending';"
+    cur.execute("select f.requestid, u.userid, username from project_schema.users u, project_schema.friendrequests f where u.userid=f.senderid and f.receiverid=%s and f.requeststatus='PENDING';"
                 ,(session['id'],))
     friendrequests=cur.fetchall()
     msg="You have "+str(len(friendrequests))+" friend request(s)"
     cur.close()
     conn.close()
-    
+
     return render_template('viewfriendrequest.html', requests=friendrequests, msg=msg)
 
 # Respond to a friend request
@@ -656,15 +669,16 @@ def respond(id, respond):
         )
         conn.commit()
         cur.execute(
-            "update project_schema.friendrequests set requeststatus='accepted' where requestid=%s",
+            "update project_schema.friendrequests set requeststatus='ACCEPTED' where requestid=%s",
             (id,)
         )
         conn.commit()
     # Reject
     else:
         cur.execute(
-            "update project_schema.friendrequests set requeststatus='rejected' where requestid=%s",
-            (id, session['id'],)
+            "update project_schema.friendrequests set requeststatus='REJECTED' where requestid=%s",
+            # (id, session['id'],)
+            (id,)
         )
         conn.commit()
         
@@ -696,8 +710,9 @@ def addneighbor():
     form=FriendRequestForm()
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT u.userid, u.username, blockid FROM project_schema.users u, project_schema.userblocks ub where u.userid=ub.userid and ub.isjoined=true and not exists(select * from project_schema.userneighbors un where u.userid=userid1 and userid2=%s) and (ub.blockid=(select blockid from project_schema.userblocks where userid=%s and isjoined=true)) and u.userid!=%s ORDER BY u.userid;"
+    cur.execute("SELECT u.userid, u.username, blockid FROM project_schema.users u, project_schema.userblocks ub where (u.userid=ub.userid and ub.isjoined=true) and not exists(select * from project_schema.userneighbors un where un.userid1=%s and un.userid2=u.userid) and (ub.blockid=(select blockid from project_schema.userblocks where userid=%s and isjoined=true)) and u.userid!=%s ORDER BY u.userid;"
                 ,(session['id'], session['id'], session['id'],))
+    print(session['id'])
     notneighbor=cur.fetchall()
     users=[(b[0], str(b[0])+' '+b[1]) for b in notneighbor]
     form.users.choices=users
@@ -707,13 +722,14 @@ def addneighbor():
         cur = conn.cursor()
         cur.execute("INSERT INTO project_schema.userneighbors(userid1, userid2) VALUES (%s, %s)", (session['id'],userid,))
         conn.commit()
-        cur.execute("INSERT INTO project_schema.userneighbors(userid1, userid2) VALUES (%s, %s)", (userid, session['id'],))
-        conn.commit()
+        # unilateral relationship,
+        # cur.execute("INSERT INTO project_schema.userneighbors(userid1, userid2) VALUES (%s, %s)", (userid, session['id'],))
+        # conn.commit()
         cur.close()
         conn.close()
         return redirect(url_for('neighbors'))
     elif request.method == 'POST':
-            msg='invalid post'
+        msg='invalid post'
     return render_template('addneighbor.html', form=form, msg=msg)
     
 # View other user's profile
