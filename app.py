@@ -209,6 +209,8 @@ def editprofile():
                 return redirect(url_for('profile'))
             else:
                 msg = 'Invalid Input!'
+        elif request.method == 'POST':
+            msg='Invalid Input!'
         return render_template('editprofile.html', title='Edit Account', form=form, msg=msg)
 
 # Posting threads
@@ -274,7 +276,7 @@ def postthread():
                 return redirect(url_for('threads', source='my'))
         elif request.method == 'POST':
             msg='invalid post'    
-        return render_template('post.html', form=form, msg=msg)
+        return render_template('post.html', form=form, msg=msg, username=session['username'])
 
 # Threads
 @app.route('/threads/<source>', methods=['GET', 'POST'])
@@ -500,6 +502,8 @@ def joinblocks():
             cur.close()
             conn.close()
             return redirect(url_for('blocks'))
+    elif request.method == 'POST':
+            msg='Invalid request!'
     return render_template('joinblocks.html', msg=msg, form=form)
 
 # View the requests for joining user's joined block
@@ -614,7 +618,9 @@ def sendfriendrequest():
         cur.close()
         conn.close()
         return redirect(url_for('sendfriendrequest'))
-    return render_template('sendfriendrequest.html', form=form, myrequests=myrequests)
+    elif request.method == 'POST':
+            msg='Invalid request'
+    return render_template('sendfriendrequest.html', form=form, myrequests=myrequests, msg=msg)
 
 # View received friend requests
 @app.route('/viewfriendrequest/', methods=['GET', 'POST'])
@@ -626,10 +632,11 @@ def viewfriendrequest():
     cur.execute("select f.requestid, u.userid, username from project_schema.users u, project_schema.friendrequests f where u.userid=f.senderid and f.receiverid=%s and f.requeststatus='pending';"
                 ,(session['id'],))
     friendrequests=cur.fetchall()
+    msg="You have "+str(len(friendrequests))+" friend request(s)"
     cur.close()
     conn.close()
     
-    return render_template('viewfriendrequest.html', requests=friendrequests)
+    return render_template('viewfriendrequest.html', requests=friendrequests, msg=msg)
 
 # Respond to a friend request
 @app.route('/respond/<id>/<respond>/', methods=['GET', 'POST'])
@@ -685,6 +692,7 @@ def neighbors():
 # Adding a user(block member) as neighbor 
 @app.route('/addneighbor/', methods=['GET', 'POST'])
 def addneighbor():
+    msg=''
     form=FriendRequestForm()
     conn = get_db_connection()
     cur = conn.cursor()
@@ -704,7 +712,9 @@ def addneighbor():
         cur.close()
         conn.close()
         return redirect(url_for('neighbors'))
-    return render_template('addneighbor.html', form=form)
+    elif request.method == 'POST':
+            msg='invalid post'
+    return render_template('addneighbor.html', form=form, msg=msg)
     
 # View other user's profile
 @app.route('/viewprofile/<id>', methods=['GET'])
@@ -721,7 +731,7 @@ def viewprofile(id):
             'SELECT * FROM project_schema.useractivity where userid=%s;',
             (id,)
     )
-    # Login time
+    # Login
     logintime = cur.fetchone()
     cur.close()
     conn.close()

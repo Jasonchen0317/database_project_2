@@ -31,7 +31,7 @@ class ThreadForm(FlaskForm):
     rid=StringField('Recipient ID', validators=[DataRequired(), isinteger])
     latitude = StringField('Latitude', validators=[])
     longitude = StringField('Longitude', validators=[])
-    body=TextAreaField('Body', validators=[])
+    body=TextAreaField('Post', validators=[])
     submit = SubmitField('Post')
    
 class ReplyForm(FlaskForm):
