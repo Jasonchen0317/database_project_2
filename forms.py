@@ -27,8 +27,7 @@ class EditForm(FlaskForm):
 
 class ThreadForm(FlaskForm):
     title = StringField('Title', validators=[DataRequired()])
-    target = SelectField('Target', choices=[('friend', 'Friend'), ('neighbor', 'Neighbor'), ('hood', 'Hood'), ('block', 'Block')])
-    rid=StringField('Recipient ID', validators=[DataRequired(), isinteger])
+    target = SelectField('Target', choices=[])
     latitude = StringField('Latitude', validators=[])
     longitude = StringField('Longitude', validators=[])
     body=TextAreaField('Post', validators=[])

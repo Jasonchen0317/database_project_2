@@ -220,12 +220,36 @@ def postthread():
     msg=''
     form = ThreadForm()
     if 'loggedin' in session:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT userid2, username FROM project_schema.userfriends uf, project_schema.users u where uf.userid2=u.userid and uf.userid1=%s;",
+            (session['id'],))
+        friends=cur.fetchall()
+        cur.execute(
+            "SELECT userid2, username FROM project_schema.userneighbors uf, project_schema.users u where uf.userid2=u.userid and uf.userid1=%s;",
+            (session['id'],))
+        neighbors=cur.fetchall()
+        cur.execute(
+            'SELECT b.blockid, b.name FROM project_schema.userblocks ub, project_schema.blocks b WHERE ub.blockid = b.blockid and userid=%s and isjoined=true;',
+            (session['id'],)
+        )
+        blocks = cur.fetchall()
+        cur.execute(
+            'SELECT n.neighborhoodid, name FROM (select userid, neighborhoodid from project_schema.userblocks ub, project_schema.blocks b WHERE ub.blockid = b.blockid and userid=%s and isjoined=true) un, project_schema.neighborhoods n where un.neighborhoodid=n.neighborhoodid;',
+            (session['id'],)
+        )
+        hoods = cur.fetchall()
+        targets=[('friend,'+str(b[0]), 'Friend:'+str(b[0])+' '+b[1]) for b in friends]+[('neighbor,'+str(b[0]), 'Neighbor:'+str(b[0])+' '+b[1]) for b in neighbors]+[('block,'+str(b[0]), 'Block:'+str(b[0])+' '+b[1]) for b in blocks]+[('hood,'+str(b[0]), 'Neighborhood:'+str(b[0])+' '+b[1]) for b in hoods]
+        form.target.choices=targets
         if form.validate_on_submit():
             title = form.title.data 
             lat = form.latitude.data
             long = form.longitude.data
-            rid = form.rid.data
-            target = form.target.data
+            targetandid=form.target.data
+            target = targetandid.split(',')[0]
+            rid = int(targetandid.split(',')[1])
+            
             body = form.body.data
             conn = get_db_connection()
             cur = conn.cursor()
