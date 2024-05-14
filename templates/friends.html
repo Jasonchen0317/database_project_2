@@ -8,6 +8,7 @@
     {% for f in friends %}
         <div class='friend'>
             <h3>ID: {{ f[0] }} - Name: {{ f[1] }}</h3>
+            <a href="{{ url_for('viewprofile', id=f[0]) }}">View Profile</a>
         </div>
     {% endfor %}
     <div class='msg1'>{{ msg }}</div>

@@ -10,7 +10,7 @@ from utils import is_number
 app = Flask(__name__)
 app.secret_key = 'yoursecretkey'
 
-# Function for getting connection
+# Get connection from database
 def get_db_connection():
     conn = psycopg2.connect(host='localhost',
                             database='postgres',
@@ -18,7 +18,7 @@ def get_db_connection():
                             password='jason123')
     return conn
 
-
+# Login
 @app.route('/', methods=('GET', 'POST'))
 def login():
     msg = ''
@@ -51,7 +51,22 @@ def login():
                 'select lastaccesstimestamp from project_schema.useractivity where userid=%s;', 
                 (session['id'],)
             )
-            session['lastlogintime']=cur.fetchone()[0]
+            lastlogintime = cur.fetchone()
+            
+            # If it is user's first time login, log the current time and use it as last login time
+            if not lastlogintime:
+                cur.execute(
+                    'insert into project_schema.useractivity(userid, lastaccesstimestamp) values(%s, CURRENT_TIMESTAMP);', 
+                    (session['id'],)
+                )
+                conn.commit()
+                cur.execute(
+                    'select lastaccesstimestamp from project_schema.useractivity where userid=%s;', 
+                    (session['id'],)
+                )
+                lastlogintime = cur.fetchone()
+            # Else: fetch last login time and update 
+            session['lastlogintime']=lastlogintime[0]
             # Update login time
             cur.execute(
                 'insert into project_schema.useractivity(userid, lastaccesstimestamp) values(%s, CURRENT_TIMESTAMP) on conflict(userid) do update set lastaccesstimestamp=CURRENT_TIMESTAMP;', 
@@ -68,12 +83,13 @@ def login():
     # Show the login form with message (if any)
     return render_template('login.html', msg=msg)
 
+# Register a new account
 @app.route('/register/', methods=['GET', 'POST'])
 def register():
     # Output message if something goes wrong...
     msg = ''
     form = SignUpForm()
-    #Submit form
+    #Submit register form
     if form.validate_on_submit():
         username = form.username.data
         password = form.password.data
@@ -111,6 +127,7 @@ def register():
     
     return render_template('register.html', msg=msg, form=form)
 
+# Logout
 @app.route('/logout/')
 def logout():
     # Remove session data, this will log the user out
@@ -120,6 +137,7 @@ def logout():
    # Redirect to login page
    return redirect(url_for('login'))
 
+# Home Page
 @app.route('/index/')
 def index():
     if 'loggedin' in session:
@@ -137,6 +155,7 @@ def profile():
             (session['id'],)
         )
         profile = cur.fetchone()
+        # Fetch login time
         cur.execute(
             'SELECT * FROM project_schema.useractivity where userid=%s;',
             (session['id'],)
@@ -190,7 +209,6 @@ def editprofile():
                 msg = 'Invalid Input!'
         return render_template('editprofile.html', title='Edit Account', form=form, msg=msg)
     
-
 @app.route('/postthread/', methods=['GET', 'POST'])
 def postthread():
     #Insert into both thread and message table
@@ -251,7 +269,6 @@ def postthread():
         elif request.method == 'POST':
             msg='invalid post'    
         return render_template('post.html', form=form, msg=msg)
-
             
 @app.route('/threads/<source>', methods=['GET', 'POST'])
 def threads(source):
@@ -646,7 +663,7 @@ def addneighbor():
     cur.execute("SELECT u.userid, u.username, blockid FROM project_schema.users u, project_schema.userblocks ub where u.userid=ub.userid and ub.isjoined=true and not exists(select * from project_schema.userneighbors un where u.userid=userid1 and userid2=%s) and (ub.blockid=(select blockid from project_schema.userblocks where userid=%s and isjoined=true)) and u.userid!=%s ORDER BY u.userid;"
                 ,(session['id'], session['id'], session['id'],))
     notneighbor=cur.fetchall()
-    users=[(b[0], str(b[0])+' '+b[1]+' '+str(b[2])) for b in notneighbor]
+    users=[(b[0], str(b[0])+' '+b[1]) for b in notneighbor]
     form.users.choices=users
     if form.validate_on_submit():
         userid = form.users.data
@@ -661,6 +678,24 @@ def addneighbor():
         return redirect(url_for('neighbors'))
     return render_template('addneighbor.html', form=form)
         
+@app.route('/viewprofile/<id>', methods=['GET'])
+def viewprofile(id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+            'SELECT * FROM project_schema.users where userid=%s;',
+            (id,)
+    )
+    profile = cur.fetchone()
+    cur.execute(
+            'SELECT * FROM project_schema.useractivity where userid=%s;',
+            (id,)
+    )
+    logintime = cur.fetchone()
+    cur.close()
+    conn.close()
+    return render_template('viewprofile.html', profile=profile, logintime=logintime)
+
 @app.route('/about/')
 def about():
     return render_template('about.html')
